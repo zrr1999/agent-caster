@@ -1,0 +1,102 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-caster"
+dynamic = ["version"]
+description = "Cross-platform AI coding agent definition compiler"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "typer[all]>=0.15.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "loguru>=0.7.0",
+]
+
+[project.scripts]
+agent-caster = "agent_caster.cli:app"
+
+[project.entry-points."agent_caster.adapters"]
+opencode = "agent_caster.adapters.opencode:OpenCodeAdapter"
+claude = "agent_caster.adapters.claude:ClaudeAdapter"
+
+[dependency-groups]
+dev = [
+    { include-group = "test" },
+]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+    "syrupy>=4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--tb=short"]
+
+[tool.coverage.run]
+branch = true
+source = ["agent_caster"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "\\.\\.\\.",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "UP",    # pyupgrade
+    "SIM",   # flake8-simplify
+    "RUF",   # ruff-specific rules
+    "PGH",   # pygrep-hooks
+    "FA",    # flake8-future-annotations
+    "YTT",   # flake8-2020
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_caster"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**" = ["B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/agent_caster/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_caster"]
+
+[tool.uv]
+default-groups = ["dev"]

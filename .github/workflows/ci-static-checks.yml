@@ -1,0 +1,16 @@
+name: "CI - Static Checks"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-fmt:
+    name: lint and fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run prek
+        uses: j178/prek-action@v1
