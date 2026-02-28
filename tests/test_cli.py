@@ -10,7 +10,7 @@ runner = CliRunner()
 def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "0.0.0" in result.output
+    assert "agent-caster" in result.output
 
 
 def test_init(tmp_path):
@@ -36,22 +36,22 @@ def test_list_agents(fixtures_dir):
     assert "3 agents found" in result.output
 
 
-def test_compile_dry_run(fixtures_dir):
+def test_cast_dry_run(fixtures_dir):
     result = runner.invoke(
-        app, ["compile", "--dry-run", "--target", "opencode", "--project-dir", str(fixtures_dir)]
+        app, ["cast", "--dry-run", "--target", "opencode", "--project-dir", str(fixtures_dir)]
     )
     assert result.exit_code == 0
     assert "Target: opencode" in result.output
     assert ".opencode/agents/explorer.md" in result.output
 
 
-def test_compile_writes_files(fixtures_dir, tmp_path):
-    """Compile to a temp dir and verify files are created."""
+def test_cast_writes_files(fixtures_dir, tmp_path):
+    """Cast to a temp dir and verify files are created."""
     import shutil
 
     shutil.copytree(fixtures_dir, tmp_path / "project", dirs_exist_ok=True)
     project = tmp_path / "project"
 
-    result = runner.invoke(app, ["compile", "--target", "opencode", "--project-dir", str(project)])
+    result = runner.invoke(app, ["cast", "--target", "opencode", "--project-dir", str(project)])
     assert result.exit_code == 0
     assert (project / ".opencode" / "agents" / "explorer.md").is_file()

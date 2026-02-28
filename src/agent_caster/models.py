@@ -50,7 +50,7 @@ class ProjectConfig(BaseModel, frozen=True):
 
 
 class OutputFile(BaseModel, frozen=True):
-    """A file to be written by the compiler."""
+    """A file to be written by the caster."""
 
     path: str  # relative to output_dir
     content: str

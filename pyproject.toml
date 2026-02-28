@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-caster"
 dynamic = ["version"]
-description = "Cross-platform AI coding agent definition compiler"
+description = "Cross-platform AI coding agent definition caster"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [

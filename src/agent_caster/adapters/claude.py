@@ -31,7 +31,7 @@ _TOOL_FLAG_MAP: dict[str, str] = {
 class ClaudeAdapter:
     name: str = "claude"
 
-    def compile(
+    def cast(
         self,
         agents: list[AgentDef],
         config: TargetConfig,

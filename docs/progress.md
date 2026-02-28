@@ -21,15 +21,15 @@
   - `src/agent_caster/adapters/__init__.py` — adapter registry
   - `src/agent_caster/adapters/opencode.py` — OpenCode adapter (migrated from generate.py)
   - `src/agent_caster/adapters/claude.py` — Claude Code adapter (new)
-  - `src/agent_caster/compiler.py` — compile_agents(), write_outputs()
-  - `src/agent_caster/cli.py` — init, compile, list commands
+  - `src/agent_caster/caster.py` — cast_agents(), write_outputs()
+  - `src/agent_caster/cli.py` — init, cast, list commands
 
 ### Phase 5: Validation
 - **Status:** complete
 - Actions taken:
   - Copied 8 PAA agent definitions as test fixtures
   - Compiled to OpenCode format and diffed against reference: **8/8 exact matches**
-  - Compiled to Claude Code format — correct tool mapping
+  - Cast to Claude Code format — correct tool mapping
   - Tested init command — creates dirs + refit.toml
   - Tested list command — shows all 8 agents correctly
 
@@ -62,5 +62,5 @@
 | CLI `--version` | 0.0.0 |
 | CLI `list` | Shows 8 agents with correct metadata |
 | CLI `init` | Creates .agents/roles/ + refit.toml |
-| CLI `compile --dry-run` | Correct preview output |
-| CLI `compile` writes files | Files created correctly |
+| CLI `cast --dry-run` | Correct preview output |
+| CLI `cast` writes files | Files created correctly |

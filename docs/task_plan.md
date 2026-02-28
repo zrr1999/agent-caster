@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build `agent-caster` — a cross-platform AI coding agent definition compiler that reads canonical `.agents/roles/*.md` definitions and compiles them to platform-specific configs (OpenCode, Claude Code), with CLI commands `init`, `compile`, `list`, and PyPI-ready packaging.
+Build `agent-caster` — a cross-platform AI coding agent definition caster that reads canonical `.agents/roles/*.md` definitions and casts them to platform-specific configs (OpenCode, Claude Code), with CLI commands `init`, `cast`, `list`, and PyPI-ready packaging.
 
 ## Current Phase
 
@@ -23,7 +23,7 @@ Phase 1
 - [ ] Implement `adapters/base.py` — `Adapter` Protocol
 - [ ] Implement `adapters/opencode.py` — migrated from `precision-alignment-agent/adapters/opencode/generate.py`
 - [ ] Ensure capability group expansion, model tier mapping, permission generation
-- [ ] Write tests: compile a sample agent set, verify output matches expected
+- [ ] Write tests: cast a sample agent set, verify output matches expected
 - **Status:** pending
 
 ### Phase 3: Claude Code Adapter
@@ -33,11 +33,11 @@ Phase 1
 - [ ] Write tests for Claude Code output
 - **Status:** pending
 
-### Phase 4: Compiler Dispatcher & CLI
-- [ ] Implement `compiler.py` — loads config + agents, dispatches to enabled adapters
+### Phase 4: Caster Dispatcher & CLI
+- [ ] Implement `caster.py` — loads config + agents, dispatches to enabled adapters
 - [ ] Implement `cli.py` with click:
   - `agent-caster init` — scaffold `.agents/roles/` + `refit.toml`
-  - `agent-caster compile [--target T] [--dry-run] [--diff]`
+  - `agent-caster cast [--target T] [--dry-run] [--diff]`
   - `agent-caster list` — tabular listing of agents
 - [ ] Register `console_scripts` entry point in `pyproject.toml`
 - [ ] Write CLI integration tests
@@ -46,14 +46,14 @@ Phase 1
 ### Phase 5: Validation Against Real Data
 - [ ] Copy `precision-alignment-agent/agents/*.md` into a test fixture as `.agents/roles/`
 - [ ] Create a matching `refit.toml` with opencode target config
-- [ ] Run `agent-caster compile --target opencode` and diff against existing `.opencode/agents/`
+- [ ] Run `agent-caster cast --target opencode` and diff against existing `.opencode/agents/`
 - [ ] Verify output is equivalent (or document intentional improvements)
-- [ ] Run `agent-caster compile --target claude` and review Claude Code output
+- [ ] Run `agent-caster cast --target claude` and review Claude Code output
 - **Status:** pending
 
 ### Phase 6: Packaging & Delivery
 - [ ] Finalize `pyproject.toml` metadata (name, version, description, license, URLs)
-- [ ] Verify `uvx agent-caster compile` works (console_scripts entry point)
+- [ ] Verify `uvx agent-caster cast` works (console_scripts entry point)
 - [ ] Add a README.md
 - [ ] Git init + initial commit
 - **Status:** pending

@@ -38,7 +38,7 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-app = typer.Typer(help="agent-caster: Cross-platform AI coding agent definition compiler.")
+app = typer.Typer(help="agent-caster: Cross-platform AI coding agent definition caster.")
 
 
 @app.callback()
@@ -48,7 +48,7 @@ def main(
         typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version"),
     ] = None,
 ) -> None:
-    """agent-caster: Cross-platform AI coding agent definition compiler."""
+    """agent-caster: Cross-platform AI coding agent definition caster."""
 
 
 @app.command()
@@ -72,13 +72,13 @@ def init(
     logger.info("\nNext steps:")
     logger.info("  1. Add agent definitions to .agents/roles/")
     logger.info("  2. Configure targets in refit.toml")
-    logger.info("  3. Run: agent-caster compile")
+    logger.info("  3. Run: agent-caster cast")
 
 
-@app.command("compile")
-def compile_cmd(
+@app.command("cast")
+def cast_cmd(
     target: Annotated[
-        list[str] | None, typer.Option("--target", "-t", help="Target platform(s) to compile")
+        list[str] | None, typer.Option("--target", "-t", help="Target platform(s) to cast")
     ] = None,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview output without writing")
@@ -87,14 +87,14 @@ def compile_cmd(
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Compile canonical agent definitions to platform configs."""
-    from agent_caster.compiler import compile_agents, write_outputs
+    """Cast canonical agent definitions to platform configs."""
+    from agent_caster.caster import cast_agents, write_outputs
 
     root = Path(project_dir).resolve() if project_dir else None
     targets_list = list(target) if target else None
 
     try:
-        result, config, project_root = compile_agents(project_root=root, targets=targets_list)
+        result, config, project_root = cast_agents(project_root=root, targets=targets_list)
     except Exception as e:
         logger.error(f"Error: {e}")
         raise typer.Exit(1) from e
@@ -111,7 +111,7 @@ def compile_cmd(
                     logger.info(f"  ... ({len(lines) - 40} more lines)")
     else:
         written = write_outputs(result, project_root, config)
-        logger.info(f"Compiled {len(written)} files:")
+        logger.info(f"Cast {len(written)} files:")
         for p in written:
             try:
                 logger.info(f"  {p.relative_to(project_root)}")

@@ -21,7 +21,7 @@ BUILTIN_CAPABILITY_GROUPS: dict[str, dict[str, bool]] = {
 class OpenCodeAdapter:
     name: str = "opencode"
 
-    def compile(
+    def cast(
         self,
         agents: list[AgentDef],
         config: TargetConfig,

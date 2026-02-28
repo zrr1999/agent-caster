@@ -1,5 +1,5 @@
 # serializer version: 1
-# name: test_compile_aligner_no_bash
+# name: test_cast_aligner_no_bash
   '''
   ---
   description: Precision Aligner. Makes targeted code changes.
@@ -20,7 +20,7 @@
   # Aligner
   '''
 # ---
-# name: test_compile_all_fixtures
+# name: test_cast_all_fixtures
   dict({
     'aligner.md': '''
       ---
@@ -107,7 +107,7 @@
     ''',
   })
 # ---
-# name: test_compile_explorer
+# name: test_cast_explorer
   '''
   ---
   description: Code Explorer. Reads and analyzes source code.
@@ -137,7 +137,7 @@
   Read-only code exploration agent.
   '''
 # ---
-# name: test_compile_orchestrator_with_delegates
+# name: test_cast_orchestrator_with_delegates
   '''
   ---
   description: Orchestrator. Coordinates sub-agents.

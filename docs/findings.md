@@ -2,10 +2,10 @@
 
 ## Requirements
 
-- Cross-platform compiler for AI coding agent definitions
+- Cross-platform caster for AI coding agent definitions
 - Single canonical format (YAML frontmatter + Markdown) in `.agents/roles/*.md`
-- Compiles to: OpenCode (`.opencode/agents/` + `opencode.json`), Claude Code (`CLAUDE.md` + `.claude/agents/`), Cursor (`.cursor/rules/*.mdc`, deferred)
-- CLI: `init`, `compile`, `list` (v0.1); `add`, `update`, `inspect` (v0.2)
+- Casts to: OpenCode (`.opencode/agents/` + `opencode.json`), Claude Code (`CLAUDE.md` + `.claude/agents/`), Cursor (`.cursor/rules/*.mdc`, deferred)
+- CLI: `init`, `cast`, `list` (v0.1); `add`, `update`, `inspect` (v0.2)
 - Config via `refit.toml`
 - PyPI package, runnable via `uvx agent-caster`
 - Minimal dependencies: click, pyyaml, tomli

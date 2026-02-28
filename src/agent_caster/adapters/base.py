@@ -1,4 +1,4 @@
-"""Adapter protocol for platform-specific compilation."""
+"""Adapter protocol for platform-specific casting."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ class Adapter(Protocol):
 
     name: str
 
-    def compile(
+    def cast(
         self,
         agents: list[AgentDef],
         config: TargetConfig,

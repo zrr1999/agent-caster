@@ -1,4 +1,4 @@
-"""Compilation pipeline — loads config + agents, dispatches to adapters."""
+"""Cast pipeline — loads config + agents, dispatches to adapters."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from agent_caster.log import logger
 from agent_caster.models import OutputFile, ProjectConfig
 
 
-class CompileResult:
-    """Result of a compilation run."""
+class CastResult:
+    """Result of a cast run."""
 
     def __init__(self) -> None:
         self.outputs: dict[str, list[OutputFile]] = {}
@@ -22,11 +22,11 @@ class CompileResult:
         return sum(len(files) for files in self.outputs.values())
 
 
-def compile_agents(
+def cast_agents(
     project_root: Path | None = None,
     targets: list[str] | None = None,
-) -> tuple[CompileResult, ProjectConfig, Path]:
-    """Run the full compilation pipeline.
+) -> tuple[CastResult, ProjectConfig, Path]:
+    """Run the full cast pipeline.
 
     Returns (result, config, project_root).
     """
@@ -49,23 +49,23 @@ def compile_agents(
     else:
         active_targets = {name: cfg for name, cfg in config.targets.items() if cfg.enabled}
 
-    result = CompileResult()
+    result = CastResult()
     for target_name, target_config in active_targets.items():
         adapter = get_adapter(target_name)
-        logger.debug(f"Compiling target: {target_name}")
-        outputs = adapter.compile(agents, target_config)
+        logger.debug(f"Casting target: {target_name}")
+        outputs = adapter.cast(agents, target_config)
         result.outputs[target_name] = outputs
 
-    logger.debug(f"Compilation complete: {result.total_files} file(s) generated")
+    logger.debug(f"Cast complete: {result.total_files} file(s) generated")
     return result, config, project_root
 
 
 def write_outputs(
-    result: CompileResult,
+    result: CastResult,
     project_root: Path,
     config: ProjectConfig,
 ) -> list[Path]:
-    """Write CompileResult to disk. Returns list of paths written."""
+    """Write CastResult to disk. Returns list of paths written."""
     written: list[Path] = []
     for target_name, files in result.outputs.items():
         target_config = config.targets[target_name]

@@ -1,5 +1,5 @@
 # serializer version: 1
-# name: test_compile_aligner
+# name: test_cast_aligner
   '''
   ---
   description: Precision Aligner. Makes targeted code changes.
@@ -15,7 +15,7 @@
   # Aligner
   '''
 # ---
-# name: test_compile_explorer_with_bash
+# name: test_cast_explorer_with_bash
   '''
   ---
   description: Code Explorer. Reads and analyzes source code.
@@ -35,7 +35,7 @@
   Read-only code exploration agent.
   '''
 # ---
-# name: test_compile_orchestrator_with_delegates
+# name: test_cast_orchestrator_with_delegates
   '''
   ---
   description: Orchestrator. Coordinates sub-agents.
