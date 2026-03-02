@@ -1,17 +1,17 @@
 # agent-caster
 
-Cross-platform AI coding agent definition caster. Write once, deploy everywhere.
+AI coding agent definition manager. Fetch, install, and cast across tools.
 
 ## Why
 
-AI coding agent 平台（Claude Code、OpenCode、Cursor、Codex、Windsurf、Aider...）各有自己的 agent 配置格式。团队维护多平台 agent 定义面临配置碎片化、平台锁定和安全配置重复维护等问题。
+AI coding agent 工具（Claude Code、OpenCode、Cursor、Codex、Windsurf、Aider...）各有自己的 agent 配置格式。团队维护多工具 agent 定义面临配置碎片化、工具锁定和安全配置重复维护等问题。
 
-**agent-caster** 让你只写一份平台无关的 canonical agent 定义（`.agents/roles/*.md`），然后编译为各平台的具体配置。
+**agent-caster** 让你从 GitHub 安装可复用的 agent 定义，并自动适配到各工具的配置格式。
 
 | 能力 | 支持 |
 |------|:---:|
-| 单一事实来源 | ✅ |
-| 多平台输出（Claude Code / OpenCode / ...） | ✅ |
+| 从 GitHub 安装 agent 定义 | ✅ |
+| 多工具输出（Claude Code / OpenCode / ...） | ✅ |
 | Model tier 抽象（reasoning / coding） | ✅ |
 | Capability group 展开 | ✅ |
 | 权限 / 委派建模 | ✅ |
@@ -25,25 +25,37 @@ uv tool install agent-caster
 ## Quick Start
 
 ```bash
-# 初始化项目，生成 .agents/roles/ 目录和 refit.toml
-agent-caster init
+# 从 GitHub 安装 agent 定义（交互式选择）
+agent-caster add PFCCLab/precision-agents
 
-# 编译 agent 定义到所有启用的平台
-agent-caster cast
+# 跳过交互，安装全部并自动 cast
+agent-caster add PFCCLab/precision-agents -y
 
-# 仅编译到指定平台
+# 安装到全局
+agent-caster add PFCCLab/precision-agents -y --global
+
+# 从本地路径安装
+agent-caster add ./my-agents
+
+# 指定 cast 目标
+agent-caster add PFCCLab/precision-agents -y --target claude
+
+# 列出已安装的 agent
+agent-caster list
+
+# 重新 cast 到平台格式
 agent-caster cast --target claude
 
-# 预览输出（不写入文件）
-agent-caster cast --dry-run
+# 更新已安装的 agent
+agent-caster update PFCCLab/precision-agents
 
-# 列出当前所有 agent 定义
-agent-caster list
+# 移除 agent
+agent-caster remove explorer
 ```
 
 ## Canonical Agent Definition
 
-在 `.agents/roles/` 下使用 YAML frontmatter + Markdown 编写 agent 定义：
+在 `roles/` 下使用 YAML frontmatter + Markdown 编写 agent 定义：
 
 ```markdown
 ---
@@ -71,38 +83,21 @@ capabilities:
 Read-only code exploration agent. Traces execution paths and produces reports.
 ```
 
-## Configuration
+## Source Repo Convention
 
-项目根目录的 `refit.toml` 配置编译目标和模型映射：
+agent-caster 从源仓库中查找 agent 定义：
 
-```toml
-agents_dir = ".agents/roles"
+1. 有 `refit.toml` 且指定 `agents_dir` → 使用该路径
+2. 否则 → 默认 `roles/*.md`
 
-[targets.opencode]
-enabled = true
-output_dir = ".opencode/agents"
+## Supported Tools
 
-[targets.opencode.model_map]
-reasoning = "anthropic:claude-sonnet-4-20250514"
-coding = "anthropic:claude-sonnet-4-20250514"
-
-[targets.claude]
-enabled = true
-output_dir = ".claude/agents"
-
-[targets.claude.model_map]
-reasoning = "claude-sonnet-4-20250514"
-coding = "claude-sonnet-4-20250514"
-```
-
-## Supported Platforms
-
-| Platform | Adapter | Output |
-|----------|---------|--------|
+| Tool | Adapter | Output |
+|------|---------|--------|
 | Claude Code | `claude` | `.claude/agents/*.md` |
 | OpenCode | `opencode` | `.opencode/agents/*.md` |
 
-更多平台适配器开发中。
+更多工具适配器开发中。
 
 ## Development
 
