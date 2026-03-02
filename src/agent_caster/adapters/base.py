@@ -11,6 +11,7 @@ class Adapter(Protocol):
     """Protocol that all platform adapters must implement."""
 
     name: str
+    default_model_map: dict[str, str]
 
     def cast(
         self,

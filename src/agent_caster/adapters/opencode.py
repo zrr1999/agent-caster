@@ -8,9 +8,15 @@ from __future__ import annotations
 from agent_caster.groups import BASH_POLICIES, TOOL_GROUPS
 from agent_caster.models import AgentDef, ModelConfig, OutputFile, TargetConfig
 
+DEFAULT_MODEL_MAP: dict[str, str] = {
+    "reasoning": "anthropic:claude-opus-4-6",
+    "coding": "anthropic:claude-sonnet-4",
+}
+
 
 class OpenCodeAdapter:
     name: str = "opencode"
+    default_model_map: dict[str, str] = DEFAULT_MODEL_MAP
 
     def cast(
         self,

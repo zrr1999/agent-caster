@@ -91,3 +91,9 @@ def test_read_group_maps_to_claude_tools(claude_config):
     adapter = ClaudeAdapter()
     tools, _, _ = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
     assert set(tools) == {"Glob", "Grep", "Read"}
+
+
+def test_default_model_map():
+    adapter = ClaudeAdapter()
+    assert "reasoning" in adapter.default_model_map
+    assert "coding" in adapter.default_model_map
