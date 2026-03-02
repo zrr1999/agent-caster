@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Annotated
 
@@ -10,35 +11,15 @@ import typer
 from agent_caster import __version__
 from agent_caster.log import logger
 
-DEFAULT_REFIT_TOML = """\
-[project]
-agents_dir = ".agents/roles"
-
-[targets.opencode]
-enabled = true
-output_dir = "."
-
-[targets.opencode.model_map]
-reasoning = "github-copilot/claude-opus-4.6"
-coding = "github-copilot/gpt-5.2-codex"
-
-[targets.claude]
-enabled = true
-output_dir = "."
-
-[targets.claude.model_map]
-reasoning = "claude-opus-4.6"
-coding = "claude-sonnet-4"
-"""
+app = typer.Typer(
+    help="agent-caster: AI coding agent definition manager. Fetch, install, and cast across tools."
+)
 
 
 def _version_callback(value: bool) -> None:
     if value:
         logger.info(f"agent-caster {__version__}")
         raise typer.Exit()
-
-
-app = typer.Typer(help="agent-caster: Cross-platform AI coding agent definition caster.")
 
 
 @app.callback()
@@ -48,75 +29,104 @@ def main(
         typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version"),
     ] = None,
 ) -> None:
-    """agent-caster: Cross-platform AI coding agent definition caster."""
+    """agent-caster: AI coding agent definition manager."""
 
 
 @app.command()
-def init(
-    directory: Annotated[str, typer.Option("--dir", help="Project directory")] = ".",
-) -> None:
-    """Initialize a new agent-caster project."""
-    project = Path(directory).resolve()
-
-    agents_dir = project / ".agents" / "roles"
-    agents_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Created {agents_dir}")
-
-    config_path = project / "refit.toml"
-    if config_path.exists():
-        logger.info(f"refit.toml already exists at {config_path}, skipping")
-    else:
-        config_path.write_text(DEFAULT_REFIT_TOML, encoding="utf-8")
-        logger.info(f"Created {config_path}")
-
-    logger.info("\nNext steps:")
-    logger.info("  1. Add agent definitions to .agents/roles/")
-    logger.info("  2. Configure targets in refit.toml")
-    logger.info("  3. Run: agent-caster cast")
-
-
-@app.command("cast")
-def cast_cmd(
-    target: Annotated[
-        list[str] | None, typer.Option("--target", "-t", help="Target platform(s) to cast")
-    ] = None,
-    dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Preview output without writing")
+def add(
+    source: Annotated[str, typer.Argument(help="Source: org/repo[@ref] or local path")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip all prompts")] = False,
+    global_install: Annotated[
+        bool, typer.Option("--global", "-g", help="Install to ~/.agents/roles/")
     ] = False,
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Cast target platform(s)")
+    ] = None,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Cast canonical agent definitions to platform configs."""
-    from agent_caster.caster import cast_agents, write_outputs
+    """Add agent definitions from a source."""
+    from agent_caster.adapters import get_adapter
+    from agent_caster.loader import load_agents
+    from agent_caster.models import TargetConfig
+    from agent_caster.platform import detect_platforms
+    from agent_caster.registry import fetch_source, find_agents_dir, parse_source
 
-    root = Path(project_dir).resolve() if project_dir else None
-    targets_list = list(target) if target else None
+    parsed = parse_source(source)
 
     try:
-        result, config, project_root = cast_agents(project_root=root, targets=targets_list)
+        repo_path = fetch_source(parsed)
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error fetching source: {e}")
         raise typer.Exit(1) from e
 
-    if dry_run:
-        for target_name, files in result.outputs.items():
-            logger.info(f"\n=== Target: {target_name} ({len(files)} files) ===")
-            for f in files:
-                logger.info(f"\n-- {f.path} --")
-                lines = f.content.split("\n")
-                preview = "\n".join(lines[:40])
-                logger.info(preview)
-                if len(lines) > 40:
-                    logger.info(f"  ... ({len(lines) - 40} more lines)")
+    try:
+        agents_dir = find_agents_dir(repo_path)
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        raise typer.Exit(1) from e
+
+    agents = load_agents(agents_dir)
+    if not agents:
+        logger.error("No agent definitions found in source.")
+        raise typer.Exit(1)
+
+    logger.info(f"Found {len(agents)} agents:")
+    for a in agents:
+        logger.info(f"  {a.name:<25} {a.role:<10} {a.model.tier}")
+
+    # Determine install target
+    if global_install:
+        install_dir = Path.home() / ".agents" / "roles"
     else:
-        written = write_outputs(result, project_root, config)
-        logger.info(f"Cast {len(written)} files:")
-        for p in written:
-            try:
-                logger.info(f"  {p.relative_to(project_root)}")
-            except ValueError:
-                logger.info(f"  {p}")
+        project = Path(project_dir).resolve() if project_dir else Path.cwd()
+        install_dir = project / ".agents" / "roles"
+
+    install_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy agent files
+    for a in agents:
+        if a.source_path:
+            dest = install_dir / a.source_path.name
+            shutil.copy2(a.source_path, dest)
+            logger.info(f"  Installed {a.name}")
+
+    logger.info(f"\nInstalled {len(agents)} agents to {install_dir}")
+
+    # Auto-cast
+    if global_install and not target:
+        return
+
+    project = Path(project_dir).resolve() if project_dir else Path.cwd()
+
+    cast_targets = list(target) if target else detect_platforms(project)
+
+    if not cast_targets:
+        return
+
+    installed_agents = load_agents(install_dir)
+    for target_name in cast_targets:
+        try:
+            adapter = get_adapter(target_name)
+        except ValueError:
+            logger.error(f"Unknown target: {target_name}")
+            continue
+
+        config = TargetConfig(
+            name=target_name,
+            enabled=True,
+            output_dir=".",
+            model_map=adapter.default_model_map,
+        )
+
+        outputs = adapter.cast(installed_agents, config)
+        for out in outputs:
+            full_path = project / out.path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_text(out.content, encoding="utf-8")
+
+        logger.info(f"Cast {len(outputs)} agents → {target_name}")
 
 
 @app.command("list")
@@ -125,19 +135,17 @@ def list_agents(
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """List all agent definitions."""
-    from agent_caster.config import find_config, load_config
+    """List all installed agent definitions."""
     from agent_caster.loader import load_agents
 
-    if project_dir:
-        root = Path(project_dir).resolve()
-        config = load_config(root / "refit.toml")
-    else:
-        config_path = find_config()
-        root = config_path.parent
-        config = load_config(config_path)
+    project = Path(project_dir).resolve() if project_dir else Path.cwd()
+    agents_dir = project / ".agents" / "roles"
 
-    agents = load_agents(root / config.agents_dir)
+    if not agents_dir.is_dir():
+        logger.error("No agents found. Run 'agent-caster add' first.")
+        raise typer.Exit(1)
+
+    agents = load_agents(agents_dir)
 
     logger.info(f"{'AGENT':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
     logger.info("-" * 55)
@@ -145,4 +153,103 @@ def list_agents(
         temp = str(agent.model.temperature) if agent.model.temperature is not None else "-"
         logger.info(f"{agent.name:<25} {agent.role:<10} {agent.model.tier:<12} {temp:<6}")
 
-    logger.info(f"\n{len(agents)} agents found in {config.agents_dir}")
+    logger.info(f"\n{len(agents)} agents found")
+
+
+@app.command()
+def cast(
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
+    ] = None,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Cast installed agent definitions to platform-specific configs."""
+    from agent_caster.adapters import get_adapter
+    from agent_caster.loader import load_agents
+    from agent_caster.models import TargetConfig
+    from agent_caster.platform import detect_platforms
+
+    project = Path(project_dir).resolve() if project_dir else Path.cwd()
+    agents_dir = project / ".agents" / "roles"
+
+    if not agents_dir.is_dir():
+        logger.error("No agents found. Run 'agent-caster add' first.")
+        raise typer.Exit(1)
+
+    agents = load_agents(agents_dir)
+    cast_targets = list(target) if target else detect_platforms(project)
+
+    if not cast_targets:
+        logger.error("No platforms detected. Use --target to specify.")
+        raise typer.Exit(1)
+
+    for target_name in cast_targets:
+        try:
+            adapter = get_adapter(target_name)
+        except ValueError as e:
+            logger.error(str(e))
+            continue
+
+        config = TargetConfig(
+            name=target_name,
+            enabled=True,
+            output_dir=".",
+            model_map=adapter.default_model_map,
+        )
+
+        outputs = adapter.cast(agents, config)
+        for out in outputs:
+            full_path = project / out.path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_text(out.content, encoding="utf-8")
+
+        logger.info(f"Cast {len(outputs)} agents → {target_name}")
+
+
+@app.command()
+def remove(
+    agent_name: Annotated[str, typer.Argument(help="Agent name to remove")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Remove an installed agent definition."""
+    project = Path(project_dir).resolve() if project_dir else Path.cwd()
+    agents_dir = project / ".agents" / "roles"
+    agent_file = agents_dir / f"{agent_name}.md"
+
+    if not agent_file.is_file():
+        logger.error(f"Agent not found: {agent_name}")
+        raise typer.Exit(1)
+
+    agent_file.unlink()
+    logger.info(f"Removed {agent_name}")
+    logger.info(
+        "Note: platform-specific files may still exist. Run 'agent-caster cast' to regenerate."
+    )
+
+
+@app.command()
+def update(
+    source: Annotated[str, typer.Argument(help="Source to update: org/repo")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip all prompts")] = False,
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Cast target platform(s)")
+    ] = None,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Update agent definitions from a previously added source."""
+    from agent_caster.registry import parse_source
+
+    parsed = parse_source(source)
+    if parsed.is_local:
+        logger.error("Cannot update a local source. Use 'add' instead.")
+        raise typer.Exit(1)
+
+    # Re-use add logic — fetch_source will git pull if cached
+    add(source=source, yes=yes, global_install=False, target=target, project_dir=project_dir)

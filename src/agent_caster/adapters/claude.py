@@ -18,9 +18,15 @@ _TOOL_NAME_MAP: dict[str, str] = {
     "task": "Task",
 }
 
+DEFAULT_MODEL_MAP: dict[str, str] = {
+    "reasoning": "claude-opus-4-6",
+    "coding": "claude-sonnet-4",
+}
+
 
 class ClaudeAdapter:
     name: str = "claude"
+    default_model_map: dict[str, str] = DEFAULT_MODEL_MAP
 
     def cast(
         self,

@@ -160,3 +160,9 @@ def test_write_group_expands_tools(opencode_config):
     adapter = OpenCodeAdapter()
     tools, _, _ = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
     assert tools == {"write": True, "edit": True}
+
+
+def test_default_model_map():
+    adapter = OpenCodeAdapter()
+    assert "reasoning" in adapter.default_model_map
+    assert "coding" in adapter.default_model_map
