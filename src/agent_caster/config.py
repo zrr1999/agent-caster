@@ -13,20 +13,6 @@ class ConfigError(Exception):
     """Raised when refit.toml is invalid or missing."""
 
 
-def find_config(start: Path | None = None) -> Path:
-    """Find refit.toml by searching upward from start (default: cwd)."""
-    current = (start or Path.cwd()).resolve()
-    while True:
-        candidate = current / "refit.toml"
-        if candidate.is_file():
-            logger.debug(f"Found config at {candidate}")
-            return candidate
-        parent = current.parent
-        if parent == current:
-            raise ConfigError(f"refit.toml not found (searched upward from {start or Path.cwd()})")
-        current = parent
-
-
 def load_config(config_path: Path) -> ProjectConfig:
     """Parse refit.toml and return ProjectConfig."""
     logger.debug(f"Loading config from {config_path}")
