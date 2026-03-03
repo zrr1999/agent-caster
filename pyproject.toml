@@ -21,6 +21,7 @@ agent-caster = "agent_caster.cli:app"
 [project.entry-points."agent_caster.adapters"]
 opencode = "agent_caster.adapters.opencode:OpenCodeAdapter"
 claude = "agent_caster.adapters.claude:ClaudeAdapter"
+cursor = "agent_caster.adapters.cursor:CursorAdapter"
 
 [project.urls]
 Homepage = "https://github.com/zrr1999/agent-caster"

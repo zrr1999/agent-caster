@@ -96,6 +96,7 @@ agent-caster 从源仓库中查找 agent 定义：
 |------|---------|--------|
 | Claude Code | `claude` | `.claude/agents/*.md` |
 | OpenCode | `opencode` | `.opencode/agents/*.md` |
+| Cursor | `cursor` | `.cursor/agents/*.mdc` |
 
 更多工具适配器开发中。
 

@@ -8,6 +8,7 @@ from pathlib import Path
 _DETECTORS: list[tuple[list[str], str]] = [
     ([".claude", "CLAUDE.md"], "claude"),
     ([".opencode", "opencode.json"], "opencode"),
+    ([".cursor", ".cursorrules"], "cursor"),
 ]
 
 
