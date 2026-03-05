@@ -30,6 +30,8 @@ jobs:
 
       - name: Install the latest version of uv 📦
         uses: astral-sh/setup-uv@v6
+
+      - name: Type check
         run: |
           uv sync --all-extras --dev
           uvx ty check
