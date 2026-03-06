@@ -89,3 +89,48 @@ def test_load_agents_strict_raises_on_bad_file(tmp_path: Path) -> None:
 
     with pytest.raises(LoadError):
         load_agents(agents_dir, strict=True)
+
+
+def test_load_agents_recursive(tmp_path: Path) -> None:
+    """Agents in sub-directories are discovered and loaded."""
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir()
+
+    # Top-level agent
+    (roles_dir / "root-agent.md").write_text(
+        "---\nname: root-agent\ndescription: top level\n---\n# Root"
+    )
+    # Sub-directory agent
+    subdir = roles_dir / "team-a"
+    subdir.mkdir()
+    (subdir / "scout.md").write_text(
+        "---\nname: team-a-scout\ndescription: nested scout\n---\n# Scout"
+    )
+    # Deeper nesting
+    deeper = subdir / "deep"
+    deeper.mkdir()
+    (deeper / "worker.md").write_text(
+        "---\nname: deep-worker\ndescription: deeply nested\n---\n# Worker"
+    )
+
+    agents = load_agents(roles_dir)
+    names = [a.name for a in agents]
+    assert "root-agent" in names
+    assert "team-a-scout" in names
+    assert "deep-worker" in names
+    assert len(agents) == 3
+
+
+def test_load_agents_recursive_skips_bad_nested(tmp_path: Path) -> None:
+    """A malformed file in a sub-directory is skipped; valid ones still load."""
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir()
+
+    (roles_dir / "good.md").write_text("---\nname: good-agent\ndescription: ok\n---\n# Good")
+    subdir = roles_dir / "nested"
+    subdir.mkdir()
+    (subdir / "bad.md").write_text("no frontmatter here\n")
+
+    agents = load_agents(roles_dir)
+    assert len(agents) == 1
+    assert agents[0].name == "good-agent"
