@@ -53,5 +53,27 @@ def test_detect_all_three(tmp_path):
     assert "cursor" in platforms
 
 
+def test_detect_windsurf_by_dir(tmp_path):
+    (tmp_path / ".windsurf").mkdir()
+    assert "windsurf" in detect_platforms(tmp_path)
+
+
+def test_detect_windsurf_by_windsurfrules(tmp_path):
+    (tmp_path / ".windsurfrules").write_text("# Windsurf rules")
+    assert "windsurf" in detect_platforms(tmp_path)
+
+
+def test_detect_all_four(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".opencode").mkdir()
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".windsurf").mkdir()
+    platforms = detect_platforms(tmp_path)
+    assert "claude" in platforms
+    assert "opencode" in platforms
+    assert "cursor" in platforms
+    assert "windsurf" in platforms
+
+
 def test_detect_none(tmp_path):
     assert detect_platforms(tmp_path) == []

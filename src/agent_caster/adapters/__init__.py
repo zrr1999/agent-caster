@@ -5,12 +5,14 @@ from __future__ import annotations
 from agent_caster.adapters.claude import ClaudeAdapter
 from agent_caster.adapters.cursor import CursorAdapter
 from agent_caster.adapters.opencode import OpenCodeAdapter
+from agent_caster.adapters.windsurf import WindsurfAdapter
 from agent_caster.models import BaseAdapter
 
 BUILTIN_ADAPTERS: dict[str, type[BaseAdapter]] = {
     "opencode": OpenCodeAdapter,
     "claude": ClaudeAdapter,
     "cursor": CursorAdapter,
+    "windsurf": WindsurfAdapter,
 }
 
 
