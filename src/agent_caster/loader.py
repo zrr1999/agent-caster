@@ -35,9 +35,7 @@ def load_agents(agents_dir: Path, *, strict: bool = False) -> list[AgentDef]:
         except LoadError as exc:
             if strict:
                 raise
-            logger.warning(
-                f"Skipping {md_path.relative_to(agents_dir)}: {exc}", exc_info=True
-            )
+            logger.warning(f"Skipping {md_path.relative_to(agents_dir)}: {exc}", exc_info=True)
     logger.debug(f"Loaded {len(agents)} agent(s) from {agents_dir}")
     return agents
 
