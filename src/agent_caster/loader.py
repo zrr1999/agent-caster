@@ -15,7 +15,10 @@ class LoadError(Exception):
 
 
 def load_agents(agents_dir: Path, *, strict: bool = False) -> list[AgentDef]:
-    """Load all agent definitions from a directory, sorted by name.
+    """Load all agent definitions from a directory (recursively), sorted by name.
+
+    Walks *agents_dir* recursively so that role files stored in sub-directories
+    (e.g. ``roles/team-a/scout.md``) are also discovered and loaded.
 
     By default, files that fail to parse are skipped with a warning so that
     one malformed definition does not block the rest.  Pass ``strict=True`` to
@@ -25,14 +28,16 @@ def load_agents(agents_dir: Path, *, strict: bool = False) -> list[AgentDef]:
         raise LoadError(f"Agents directory not found: {agents_dir}")
 
     agents = []
-    for md_path in sorted(agents_dir.glob("*.md")):
-        logger.debug(f"Loading agent from {md_path.name}")
+    for md_path in sorted(agents_dir.rglob("*.md")):
+        logger.debug(f"Loading agent from {md_path.relative_to(agents_dir)}")
         try:
             agents.append(parse_agent_file(md_path))
         except LoadError as exc:
             if strict:
                 raise
-            logger.warning(f"Skipping {md_path.name}: {exc}", exc_info=True)
+            logger.warning(
+                f"Skipping {md_path.relative_to(agents_dir)}: {exc}", exc_info=True
+            )
     logger.debug(f"Loaded {len(agents)} agent(s) from {agents_dir}")
     return agents
 
