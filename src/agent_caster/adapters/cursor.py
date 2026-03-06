@@ -23,14 +23,16 @@ Notes:
 
 from __future__ import annotations
 
-from agent_caster.models import AgentDef, OutputFile, TargetConfig
+from typing import ClassVar
+
+from agent_caster.models import AgentDef, BaseAdapter, OutputFile, TargetConfig
 
 DEFAULT_MODEL_MAP: dict[str, str] = {}  # Cursor doesn't support per-agent model
 
 
-class CursorAdapter:
-    name: str = "cursor"
-    default_model_map: dict[str, str] = DEFAULT_MODEL_MAP
+class CursorAdapter(BaseAdapter):
+    name: ClassVar[str] = "cursor"
+    default_model_map: ClassVar[dict[str, str]] = DEFAULT_MODEL_MAP
 
     def cast(
         self,
