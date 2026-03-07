@@ -1,45 +1,10 @@
-## 提交流程
+# agent-caster 开发指南
 
-- 小步提交，确保每个提交聚焦单一主题
-- 提交前运行 `just ci` 确保格式、lint、类型检查和测试通过
+提交和 PR 规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## Commit message 规范
+## 提交前
 
-围绕项目功能模块来写 message，格式统一为：
-
-`<emoji> <type>(<scope>): <subject>`
-
-scope 为可选项，用于标注影响的模块。
-
-### 推荐 type
-
-- `✨ feat` 新增功能
-- `🐛 fix` 修复 bug
-- `♻️ refactor` 重构（不改变外部行为）
-- `📝 docs` 文档调整
-- `✅ test` 测试相关
-- `🔧 chore` 构建、CI、依赖等杂项
-
-### 示例
-
-- `✨ feat(adapter): add Cursor adapter`
-- `🐛 fix(claude): align output with official .claude/agents format`
-- `♻️ refactor: rename compiler to caster`
-- `📝 docs: add README and AGENTS.md`
-- `✅ test(opencode): add snapshot tests for permission block`
-- `🔧 chore: upgrade toolchain config`
-
-## PR 标题规范
-
-- 与提交规范保持一致
-- 描述要更宏观，概括 PR 整体变更
-- CI 会自动检查 PR 标题是否符合规范
-
-### 示例
-
-- `✨ feat(adapter): add Cursor adapter support`
-- `🐛 fix(loader): handle missing frontmatter gracefully`
-- `🔧 chore: upgrade CI to Python 3.14`
+运行 `just ci` 确保格式、lint、类型检查和测试通过。
 
 ## 开发命令
 

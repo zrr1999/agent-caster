@@ -103,27 +103,11 @@ agent-caster 从源仓库中查找 agent 定义：
 ## Development
 
 ```bash
-# 安装依赖
-just install
-
-# 格式化
-just format
-
-# Lint
-just lint
-
-# 类型检查
-just check
-
-# 测试
-just test
-
-# 测试 + 覆盖率
-just cov
-
-# 完整 CI 流程
-just ci
+just install   # 安装依赖
+just ci        # 完整 CI 流程（format + lint + check + test）
 ```
+
+详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## License
 
