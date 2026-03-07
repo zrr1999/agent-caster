@@ -1,0 +1,21 @@
+# serializer version: 1
+# name: test_cast_aligner
+  '''
+  ---
+  trigger: model_decision
+  description: Precision Aligner. Makes targeted code changes.
+  ---
+  # Aligner
+  '''
+# ---
+# name: test_cast_explorer
+  '''
+  ---
+  trigger: model_decision
+  description: Code Explorer. Reads and analyzes source code.
+  ---
+  # Explorer
+  
+  Read-only code exploration agent.
+  '''
+# ---
