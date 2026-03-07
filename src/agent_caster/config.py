@@ -1,4 +1,4 @@
-"""refit.toml configuration parser."""
+"""roles.toml configuration parser."""
 
 from __future__ import annotations
 
@@ -8,13 +8,39 @@ from pathlib import Path
 from agent_caster.log import logger
 from agent_caster.models import ProjectConfig, TargetConfig
 
+#: Canonical config filename (since v0.2).
+CONFIG_FILENAME = "roles.toml"
+#: Legacy filename — still supported but triggers a deprecation warning.
+LEGACY_CONFIG_FILENAME = "refit.toml"
+
 
 class ConfigError(Exception):
-    """Raised when refit.toml is invalid or missing."""
+    """Raised when roles.toml is invalid or missing."""
+
+
+def find_config(project: Path) -> Path | None:
+    """Return the config file path, preferring *roles.toml* over the legacy *refit.toml*.
+
+    If *refit.toml* is found without *roles.toml*, a deprecation warning is logged and
+    the caller should prompt the user to rename the file.
+    """
+    canonical = project / CONFIG_FILENAME
+    if canonical.is_file():
+        return canonical
+
+    legacy = project / LEGACY_CONFIG_FILENAME
+    if legacy.is_file():
+        logger.warning(
+            f"'{LEGACY_CONFIG_FILENAME}' is deprecated — please rename it to '{CONFIG_FILENAME}'. "
+            "Support for the old name will be removed in a future release."
+        )
+        return legacy
+
+    return None
 
 
 def load_config(config_path: Path) -> ProjectConfig:
-    """Parse refit.toml and return ProjectConfig."""
+    """Parse roles.toml (or legacy refit.toml) and return ProjectConfig."""
     logger.debug(f"Loading config from {config_path}")
     with open(config_path, "rb") as f:
         data = tomllib.load(f)

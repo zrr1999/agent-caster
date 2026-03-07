@@ -38,14 +38,14 @@ def _resolve_target_config(
     project: Path,
     interactive: bool = True,
 ):
-    """Build TargetConfig: refit.toml > adapter defaults > interactive prompt."""
-    from agent_caster.config import load_config
+    """Build TargetConfig: roles.toml > adapter defaults > interactive prompt."""
+    from agent_caster.config import find_config, load_config
     from agent_caster.models import TargetConfig
 
-    # 1. Try refit.toml
-    refit_path = project / "refit.toml"
-    if refit_path.is_file():
-        project_config = load_config(refit_path)
+    # 1. Try roles.toml (or legacy refit.toml with deprecation warning)
+    config_path = find_config(project)
+    if config_path is not None:
+        project_config = load_config(config_path)
         if target_name in project_config.targets:
             cfg = project_config.targets[target_name]
             if cfg.model_map:
@@ -73,7 +73,7 @@ def _resolve_target_config(
         )
 
     logger.error(
-        f"No model_map for '{target_name}'. Add [targets.{target_name}.model_map] to refit.toml."
+        f"No model_map for '{target_name}'. Add [targets.{target_name}.model_map] to roles.toml."
     )
     raise typer.Exit(1)
 

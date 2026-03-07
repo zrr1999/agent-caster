@@ -115,8 +115,19 @@ def test_fetch_github_pulls_existing_cache(mock_run, tmp_path):
 # --- find_agents_dir tests ---
 
 
+def test_find_agents_dir_with_roles_toml(tmp_path):
+    """roles.toml agents_dir is honoured (canonical name)."""
+    (tmp_path / "roles.toml").write_text('[project]\nagents_dir = "my-agents"')
+    agents = tmp_path / "my-agents"
+    agents.mkdir()
+    (agents / "test.md").write_text("---\nname: test\n---\n")
+
+    result = find_agents_dir(tmp_path)
+    assert result == agents
+
+
 def test_find_agents_dir_with_refit_toml(tmp_path):
-    """refit.toml agents_dir takes priority."""
+    """Legacy refit.toml agents_dir still works for backward compatibility."""
     (tmp_path / "refit.toml").write_text('[project]\nagents_dir = "my-agents"')
     agents = tmp_path / "my-agents"
     agents.mkdir()
@@ -126,8 +137,22 @@ def test_find_agents_dir_with_refit_toml(tmp_path):
     assert result == agents
 
 
+def test_find_agents_dir_roles_toml_takes_priority_over_refit(tmp_path):
+    """roles.toml beats refit.toml when both are present."""
+    (tmp_path / "roles.toml").write_text('[project]\nagents_dir = "canonical-agents"')
+    (tmp_path / "refit.toml").write_text('[project]\nagents_dir = "legacy-agents"')
+    canonical_agents = tmp_path / "canonical-agents"
+    canonical_agents.mkdir()
+    (canonical_agents / "test.md").write_text("---\nname: test\n---\n")
+    legacy_agents = tmp_path / "legacy-agents"
+    legacy_agents.mkdir()
+
+    result = find_agents_dir(tmp_path)
+    assert result == canonical_agents
+
+
 def test_find_agents_dir_default_roles(tmp_path):
-    """Without refit.toml, falls back to roles/."""
+    """Without any config file, falls back to roles/."""
     roles = tmp_path / "roles"
     roles.mkdir()
     (roles / "test.md").write_text("---\nname: test\n---\n")
@@ -148,6 +173,6 @@ def test_find_agents_dir_refit_without_agents_dir(tmp_path):
 
 
 def test_find_agents_dir_none_found(tmp_path):
-    """No refit.toml and no roles/ should raise."""
+    """No config file and no roles/ should raise."""
     with pytest.raises(FileNotFoundError, match="No agent definitions found"):
         find_agents_dir(tmp_path)

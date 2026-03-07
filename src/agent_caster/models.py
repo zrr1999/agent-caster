@@ -34,7 +34,7 @@ class AgentDef(BaseModel, frozen=True):
 
 
 class TargetConfig(BaseModel, frozen=True):
-    """Per-target configuration from refit.toml."""
+    """Per-target configuration from roles.toml."""
 
     name: str
     enabled: bool = True
@@ -44,7 +44,7 @@ class TargetConfig(BaseModel, frozen=True):
 
 
 class ProjectConfig(BaseModel, frozen=True):
-    """Full parsed refit.toml configuration."""
+    """Full parsed roles.toml configuration."""
 
     agents_dir: str = ".agents/roles"
     targets: dict[str, TargetConfig] = {}
