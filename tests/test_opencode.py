@@ -2,7 +2,7 @@
 
 from agent_caster.adapters.opencode import OpenCodeAdapter
 from agent_caster.groups import SAFE_BASH_PATTERNS
-from agent_caster.models import AgentDef, ModelConfig
+from agent_caster.models import AgentDef, ModelConfig, TargetConfig
 
 
 def test_cast_explorer(sample_explorer, opencode_config, snapshot):
@@ -160,3 +160,37 @@ def test_write_group_expands_tools(opencode_config):
     adapter = OpenCodeAdapter()
     tools, _, _ = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
     assert tools == {"write": True, "edit": True}
+
+
+def test_custom_tier_falls_back_to_reasoning(opencode_config):
+    """An unknown custom tier should fall back to the 'reasoning' model map entry."""
+    agent = AgentDef(
+        name="deep-worker",
+        description="Deep worker agent with custom tier.",
+        role="primary",
+        model=ModelConfig(tier="deep"),
+    )
+    adapter = OpenCodeAdapter()
+    resolved = adapter._resolve_model(agent.model, opencode_config.model_map)
+    assert resolved == opencode_config.model_map["reasoning"]
+
+
+def test_custom_tier_overrides_if_in_model_map():
+    """A custom tier explicitly listed in model_map should resolve to its value."""
+    config = TargetConfig(
+        name="opencode",
+        model_map={
+            "reasoning": "model-slow",
+            "coding": "model-fast",
+            "deep": "model-ultra",
+        },
+    )
+    agent = AgentDef(
+        name="refit",
+        description="Meta-learning agent.",
+        role="primary",
+        model=ModelConfig(tier="deep"),
+    )
+    adapter = OpenCodeAdapter()
+    resolved = adapter._resolve_model(agent.model, config.model_map)
+    assert resolved == "model-ultra"

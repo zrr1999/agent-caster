@@ -10,9 +10,16 @@ from pydantic import BaseModel
 
 
 class ModelConfig(BaseModel, frozen=True):
-    """Model configuration from agent frontmatter."""
+    """Model configuration from agent frontmatter.
 
-    tier: Literal["reasoning", "coding"] = "reasoning"
+    ``tier`` maps to an entry in the target's ``model_map`` inside
+    ``refit.toml``.  Built-in values are ``"reasoning"`` and ``"coding"``,
+    but any custom string is accepted so that projects can define their own
+    tier vocabulary (e.g. ``"deep"``, ``"lite"``, ``"refit"``).  Unknown
+    tiers fall back to the ``"reasoning"`` mapping at cast time.
+    """
+
+    tier: str = "reasoning"
     temperature: float | None = None
 
 

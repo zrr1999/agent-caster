@@ -134,3 +134,15 @@ def test_load_agents_recursive_skips_bad_nested(tmp_path: Path) -> None:
     agents = load_agents(roles_dir)
     assert len(agents) == 1
     assert agents[0].name == "good-agent"
+
+
+def test_custom_tier_accepted(tmp_path: Path) -> None:
+    """Any custom tier string should be accepted without validation errors."""
+    agents_dir = tmp_path / "roles"
+    agents_dir.mkdir()
+    (agents_dir / "agent.md").write_text(
+        "---\nname: deep-worker\ndescription: test\nmodel:\n  tier: deep\n---\n# Deep Worker\n"
+    )
+    agents = load_agents(agents_dir)
+    assert len(agents) == 1
+    assert agents[0].model.tier == "deep"
