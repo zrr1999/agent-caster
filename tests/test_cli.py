@@ -207,8 +207,8 @@ def test_update_rejects_local():
 # -- integration ---------------------------------------------------------------
 
 
-def test_add_uses_refit_toml_config(tmp_path):
-    """add should use model_map from refit.toml when present."""
+def test_add_uses_roles_toml_config(tmp_path):
+    """add should use model_map from roles.toml (canonical name) when present."""
     source = tmp_path / "source"
     roles = source / "roles"
     roles.mkdir(parents=True)
@@ -220,7 +220,48 @@ def test_add_uses_refit_toml_config(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
 
-    # Write refit.toml with custom model_map for claude target
+    # Write roles.toml (canonical name) with custom model_map for claude target
+    (project / "roles.toml").write_text(
+        "[targets.claude]\n"
+        "enabled = true\n"
+        "[targets.claude.model_map]\n"
+        'reasoning = "my-custom-reasoning"\n'
+        'coding = "my-custom-coding"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            str(source),
+            "--yes",
+            "--target",
+            "claude",
+            "--project-dir",
+            str(project),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    agent_file = project / ".claude" / "agents" / "explorer.md"
+    assert agent_file.is_file()
+    content = agent_file.read_text()
+    assert "my-custom-reasoning" in content
+
+
+def test_add_uses_refit_toml_config(tmp_path):
+    """add should use model_map from refit.toml (legacy name) when roles.toml absent."""
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (roles / "explorer.md").write_text(
+        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+    )
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    # Write refit.toml (legacy name) with custom model_map for claude target
     (project / "refit.toml").write_text(
         "[targets.claude]\n"
         "enabled = true\n"
@@ -248,8 +289,43 @@ def test_add_uses_refit_toml_config(tmp_path):
     assert "my-custom-reasoning" in content
 
 
+def test_cast_uses_roles_toml_config(tmp_path):
+    """cast should use model_map from roles.toml (canonical name) when present."""
+    agents_dir = tmp_path / ".agents" / "roles"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "explorer.md").write_text(
+        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
+        "model:\n  tier: coding\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+    )
+
+    # Write roles.toml with custom model_map for claude target
+    (tmp_path / "roles.toml").write_text(
+        "[targets.claude]\n"
+        "enabled = true\n"
+        "[targets.claude.model_map]\n"
+        'reasoning = "toml-reasoning"\n'
+        'coding = "toml-coding"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "cast",
+            "--target",
+            "claude",
+            "--project-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    agent_file = tmp_path / ".claude" / "agents" / "explorer.md"
+    assert agent_file.is_file()
+    content = agent_file.read_text()
+    assert "toml-coding" in content
+
+
 def test_cast_uses_refit_toml_config(tmp_path):
-    """cast should use model_map from refit.toml when present."""
+    """cast should use model_map from refit.toml (legacy name) when roles.toml absent."""
     agents_dir = tmp_path / ".agents" / "roles"
     agents_dir.mkdir(parents=True)
     (agents_dir / "explorer.md").write_text(

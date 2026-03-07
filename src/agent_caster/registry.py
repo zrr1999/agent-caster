@@ -120,18 +120,25 @@ def find_agents_dir(repo_path: Path) -> Path:
     """Find agent definitions directory in a fetched repo.
 
     Priority:
-    1. refit.toml agents_dir setting
-    2. roles/ directory
+    1. roles.toml agents_dir setting  (canonical)
+    2. refit.toml agents_dir setting  (legacy — deprecated)
+    3. roles/ directory
     """
-    refit_path = repo_path / "refit.toml"
-    if refit_path.is_file():
-        with open(refit_path, "rb") as f:
-            data = tomllib.load(f)
-        agents_dir_name = data.get("project", {}).get("agents_dir")
-        if agents_dir_name:
-            agents_dir = repo_path / agents_dir_name
-            if agents_dir.is_dir():
-                return agents_dir
+    _CANONICAL = "roles.toml"
+    _LEGACY = "refit.toml"
+
+    # Check canonical name first, then legacy
+    for config_name in (_CANONICAL, _LEGACY):
+        config_path = repo_path / config_name
+        if config_path.is_file():
+            with open(config_path, "rb") as f:
+                data = tomllib.load(f)
+            agents_dir_name = data.get("project", {}).get("agents_dir")
+            if agents_dir_name:
+                agents_dir = repo_path / agents_dir_name
+                if agents_dir.is_dir():
+                    return agents_dir
+            break  # found a config file (even if agents_dir key was absent) — stop looking
 
     # Default fallback
     roles_dir = repo_path / "roles"
@@ -140,5 +147,5 @@ def find_agents_dir(repo_path: Path) -> Path:
 
     raise FileNotFoundError(
         f"No agent definitions found in {repo_path}. "
-        "Expected refit.toml with agents_dir or a roles/ directory."
+        "Expected 'roles.toml' (or legacy 'refit.toml') with agents_dir, or a roles/ directory."
     )
