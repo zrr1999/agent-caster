@@ -12,15 +12,11 @@ from __future__ import annotations
 # Values are lists of semantic tool identifiers (adapter translates to platform names).
 
 TOOL_GROUPS: dict[str, list[str]] = {
-    # Primary groups
     "read": ["read", "glob", "grep"],
     "write": ["write", "edit"],
     "write-report": ["write"],
     "web-read": ["webfetch"],
     "web-access": ["webfetch", "websearch"],
-    # Backward-compat aliases
-    "read-code": ["read", "glob", "grep"],
-    "write-code": ["write", "edit"],
 }
 
 # -- Bash policies -------------------------------------------------------------

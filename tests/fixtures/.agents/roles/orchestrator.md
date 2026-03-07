@@ -10,7 +10,7 @@ model:
 skills: []
 
 capabilities:
-  - read-code
+  - read
   - write-report
   - bash:
       - "ls*"

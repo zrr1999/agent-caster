@@ -11,7 +11,7 @@ skills:
   - repomix-explorer
 
 capabilities:
-  - read-code
+  - read
   - write-report
   - web-read
   - context7

@@ -30,6 +30,7 @@ Repository = "https://github.com/zrr1999/agent-caster"
 [dependency-groups]
 dev = [
   { include-group = "test" },
+  "ruff>=0.15.5",
 ]
 test = [
   "pytest>=8.0",

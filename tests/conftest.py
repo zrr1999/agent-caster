@@ -25,7 +25,7 @@ def sample_explorer() -> AgentDef:
         model=ModelConfig(tier="reasoning", temperature=0.05),
         skills=["repomix-explorer"],
         capabilities=[
-            "read-code",
+            "read",
             "write-report",
             "web-read",
             "context7",
@@ -43,7 +43,7 @@ def sample_aligner() -> AgentDef:
         role="subagent",
         model=ModelConfig(tier="coding", temperature=0.1),
         skills=[],
-        capabilities=["read-code", "write-code"],
+        capabilities=["read", "write"],
         prompt_content="# Aligner",
     )
 
@@ -57,7 +57,7 @@ def sample_orchestrator() -> AgentDef:
         model=ModelConfig(tier="reasoning", temperature=0.2),
         skills=[],
         capabilities=[
-            "read-code",
+            "read",
             "write-report",
             {"bash": ["ls*", "cat*", "git status*"]},
             {"delegate": ["explorer", "aligner"]},

@@ -14,10 +14,6 @@ CONFIG_FILENAME = "roles.toml"
 LEGACY_CONFIG_FILENAME = "refit.toml"
 
 
-class ConfigError(Exception):
-    """Raised when roles.toml is invalid or missing."""
-
-
 def find_config(project: Path) -> Path | None:
     """Return the config file path, preferring *roles.toml* over the legacy *refit.toml*.
 
@@ -49,19 +45,15 @@ def load_config(config_path: Path) -> ProjectConfig:
     agents_dir = project.get("agents_dir", ".agents/roles")
 
     raw_targets = data.get("targets", {})
-    targets = {}
-    for name, raw in raw_targets.items():
-        targets[name] = _parse_target(name, raw)
+    targets = {
+        name: TargetConfig(
+            name=name,
+            enabled=raw.get("enabled", True),
+            output_dir=raw.get("output_dir", "."),
+            model_map=raw.get("model_map", {}),
+            capability_map=raw.get("capability_map", {}),
+        )
+        for name, raw in raw_targets.items()
+    }
 
     return ProjectConfig(agents_dir=agents_dir, targets=targets)
-
-
-def _parse_target(name: str, raw: dict) -> TargetConfig:
-    """Parse a single [targets.<name>] section."""
-    return TargetConfig(
-        name=name,
-        enabled=raw.get("enabled", True),
-        output_dir=raw.get("output_dir", "."),
-        model_map=raw.get("model_map", {}),
-        capability_map=raw.get("capability_map", {}),
-    )
