@@ -22,6 +22,7 @@ def test_parse_explorer(fixtures_dir):
     assert agent.role == "subagent"
     assert agent.model.tier == "reasoning"
     assert agent.model.temperature == 0.05
+    assert agent.canonical_id == "explorer"
     assert "repomix-explorer" in agent.skills
     assert "read-code" in agent.capabilities
     assert agent.prompt_content.startswith("# Explorer")
@@ -119,6 +120,11 @@ def test_load_agents_recursive(tmp_path: Path) -> None:
     assert "team-a-scout" in names
     assert "deep-worker" in names
     assert len(agents) == 3
+    assert {a.canonical_id for a in agents} == {
+        "root-agent",
+        "team-a/scout",
+        "team-a/deep/worker",
+    }
 
 
 def test_load_agents_recursive_skips_bad_nested(tmp_path: Path) -> None:
@@ -146,3 +152,31 @@ def test_custom_tier_accepted(tmp_path: Path) -> None:
     agents = load_agents(agents_dir)
     assert len(agents) == 1
     assert agents[0].model.tier == "deep"
+
+
+def test_parse_hierarchy_metadata(tmp_path: Path) -> None:
+    roles_dir = tmp_path / "roles"
+    nested = roles_dir / "l2"
+    nested.mkdir(parents=True)
+    agent_file = nested / "lead.md"
+    agent_file.write_text(
+        "---\n"
+        "name: lead\n"
+        "level: L2\n"
+        "class: lead\n"
+        "scheduled: false\n"
+        "callable: true\n"
+        "max_delegate_depth: 1\n"
+        "allowed_children:\n"
+        "  - l3/worker\n"
+        "---\n"
+        "# Lead\n"
+    )
+
+    agent = parse_agent_file(agent_file, agents_dir=roles_dir)
+    assert agent.canonical_id == "l2/lead"
+    assert agent.relative_path == "l2/lead.md"
+    assert agent.hierarchy.level == "L2"
+    assert agent.hierarchy.role_class == "lead"
+    assert agent.hierarchy.max_delegate_depth == 1
+    assert agent.hierarchy.allowed_children == ["l3/worker"]

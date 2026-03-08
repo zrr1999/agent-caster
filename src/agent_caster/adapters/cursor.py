@@ -26,6 +26,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from agent_caster.models import AgentDef, BaseAdapter, OutputFile, TargetConfig
+from agent_caster.topology import build_output_path, validate_agents, validate_output_layout
 
 
 class CursorAdapter(BaseAdapter):
@@ -37,10 +38,13 @@ class CursorAdapter(BaseAdapter):
         agents: list[AgentDef],
         config: TargetConfig,
     ) -> list[OutputFile]:
+        validate_agents(agents)
+        validate_output_layout(agents, config)
+
         outputs = []
         for agent in agents:
             content = self._generate_agent_mdc(agent)
-            path = f".cursor/agents/{agent.name}.mdc"
+            path = build_output_path(agent, base_dir=".cursor/agents", suffix=".mdc", config=config)
             outputs.append(OutputFile(path=path, content=content))
         return outputs
 

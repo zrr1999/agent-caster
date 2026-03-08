@@ -76,6 +76,12 @@ capabilities:
   - web-read
   - bash:
       - "npx repomix@latest*"
+
+level: L3
+class: leaf
+callable: true
+scheduled: false
+max_delegate_depth: 0
 ---
 
 # Explorer
@@ -89,6 +95,9 @@ agent-caster 从源仓库中查找 agent 定义：
 
 1. 有 `refit.toml` 且指定 `agents_dir` → 使用该路径
 2. 否则 → 默认 `roles/*.md`
+
+`roles.toml` 的 target 现在也支持 `output_layout = "preserve" | "namespace" | "flatten"`，
+可用于保留嵌套 `roles/` 的路径语义或显式启用扁平化输出。
 
 ## Supported Tools
 

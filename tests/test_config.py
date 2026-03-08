@@ -15,6 +15,7 @@ def test_opencode_target_config(fixtures_dir):
     oc = config.targets["opencode"]
     assert oc.enabled is True
     assert oc.output_dir == "."
+    assert oc.output_layout == "preserve"
     assert oc.model_map["reasoning"] == "github-copilot/claude-opus-4.6"
     assert oc.model_map["coding"] == "github-copilot/gpt-5.2-codex"
 
@@ -67,3 +68,17 @@ def test_find_config_prefers_canonical_over_legacy(tmp_path):
 def test_find_config_returns_none_when_absent(tmp_path):
     """find_config returns None if neither config file exists."""
     assert find_config(tmp_path) is None
+
+
+def test_target_output_layout_parsed(tmp_path):
+    config_path = tmp_path / CONFIG_FILENAME
+    config_path.write_text(
+        "[targets.claude]\n"
+        'output_layout = "namespace"\n'
+        "[targets.claude.model_map]\n"
+        'reasoning = "opus"\n'
+        'coding = "sonnet"\n'
+    )
+
+    config = load_config(config_path)
+    assert config.targets["claude"].output_layout == "namespace"

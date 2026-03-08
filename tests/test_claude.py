@@ -2,7 +2,7 @@
 
 from agent_caster.adapters.claude import ClaudeAdapter
 from agent_caster.groups import SAFE_BASH_PATTERNS
-from agent_caster.models import AgentDef
+from agent_caster.models import AgentDef, TargetConfig
 
 
 def test_cast_aligner(sample_aligner, claude_config, snapshot):
@@ -22,7 +22,14 @@ def test_cast_explorer_with_bash(sample_explorer, claude_config, snapshot):
 
 def test_cast_orchestrator_with_delegates(sample_orchestrator, claude_config, snapshot):
     adapter = ClaudeAdapter()
-    outputs = adapter.cast([sample_orchestrator], claude_config)
+    outputs = adapter.cast(
+        [
+            sample_orchestrator,
+            AgentDef(name="explorer", description="Explorer"),
+            AgentDef(name="aligner", description="Aligner"),
+        ],
+        claude_config,
+    )
     assert outputs[0].content == snapshot
 
 
@@ -97,3 +104,38 @@ def test_default_model_map():
     adapter = ClaudeAdapter()
     assert "reasoning" in adapter.default_model_map
     assert "coding" in adapter.default_model_map
+
+
+def test_cast_nested_agent_preserves_relative_path(claude_config):
+    agent = AgentDef(name="scout", description="Scout", relative_path="l2/scout.md")
+    adapter = ClaudeAdapter()
+    outputs = adapter.cast([agent], claude_config)
+    assert outputs[0].path == ".claude/agents/l2/scout.md"
+
+
+def test_cast_namespace_layout_uses_namespaced_delegate_ids() -> None:
+    adapter = ClaudeAdapter()
+    config = TargetConfig(
+        name="claude",
+        output_layout="namespace",
+        model_map={"reasoning": "opus", "coding": "sonnet"},
+    )
+    agents = [
+        AgentDef(
+            name="orchestrator",
+            description="Orchestrator",
+            role="primary",
+            relative_path="l1/orchestrator.md",
+            capabilities=[{"delegate": ["worker"]}],
+        ),
+        AgentDef(
+            name="worker",
+            description="Worker",
+            relative_path="l3/worker.md",
+        ),
+    ]
+
+    outputs = adapter.cast(agents, config)
+    by_path = {output.path: output.content for output in outputs}
+    assert ".claude/agents/l1__orchestrator.md" in by_path
+    assert "Task(l3__worker)" in by_path[".claude/agents/l1__orchestrator.md"]

@@ -6,6 +6,7 @@ from typing import ClassVar
 
 from agent_caster.groups import BASH_POLICIES, TOOL_GROUPS
 from agent_caster.models import AgentDef, BaseAdapter, ModelConfig, OutputFile, TargetConfig
+from agent_caster.topology import build_output_path, validate_agents, validate_output_layout
 
 # Semantic tool id -> Claude Code tool name
 _TOOL_NAME_MAP: dict[str, str] = {
@@ -33,10 +34,17 @@ class ClaudeAdapter(BaseAdapter):
         agents: list[AgentDef],
         config: TargetConfig,
     ) -> list[OutputFile]:
+        delegation_graph = validate_agents(agents)
+        validate_output_layout(agents, config)
+
         outputs = []
         for agent in agents:
-            content = self._generate_agent_md(agent, config)
-            path = f".claude/agents/{agent.name}.md"
+            delegates = [
+                target.output_id(config.output_layout)
+                for target in delegation_graph.get(agent.canonical_id, [])
+            ]
+            content = self._generate_agent_md(agent, config, delegates)
+            path = build_output_path(agent, base_dir=".claude/agents", suffix=".md", config=config)
             outputs.append(OutputFile(path=path, content=content))
         return outputs
 
@@ -136,8 +144,10 @@ class ClaudeAdapter(BaseAdapter):
         lines.append("---")
         return "\n".join(lines)
 
-    def _generate_agent_md(self, agent: AgentDef, config: TargetConfig) -> str:
-        tools, bash_patterns, delegates = self._expand_capabilities(
+    def _generate_agent_md(
+        self, agent: AgentDef, config: TargetConfig, delegates: list[str]
+    ) -> str:
+        tools, bash_patterns, _ = self._expand_capabilities(
             agent.capabilities, config.capability_map
         )
 

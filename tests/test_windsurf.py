@@ -55,6 +55,13 @@ def test_output_path_uses_agent_name():
     assert outputs[0].path == ".windsurf/rules/my-agent.md"
 
 
+def test_output_path_preserves_relative_role_path():
+    agent = AgentDef(name="worker", description="Test", relative_path="l3/worker.md")
+    adapter = WindsurfAdapter()
+    outputs = adapter.cast([agent], WINDSURF_CONFIG)
+    assert outputs[0].path == ".windsurf/rules/l3/worker.md"
+
+
 def test_default_trigger_is_model_decision():
     """Default activation trigger should be model_decision."""
     agent = AgentDef(
