@@ -5,6 +5,7 @@ from agent_caster.config import CONFIG_FILENAME, LEGACY_CONFIG_FILENAME, find_co
 
 def test_load_config_from_fixtures(fixtures_dir):
     config = load_config(fixtures_dir / "roles.toml")
+    assert config.roles_dir == ".agents/roles"
     assert config.agents_dir == ".agents/roles"
     assert "opencode" in config.targets
     assert "claude" in config.targets
@@ -82,3 +83,12 @@ def test_target_output_layout_parsed(tmp_path):
 
     config = load_config(config_path)
     assert config.targets["claude"].output_layout == "namespace"
+
+
+def test_roles_dir_preferred_over_agents_dir(tmp_path):
+    config_path = tmp_path / CONFIG_FILENAME
+    config_path.write_text('[project]\nroles_dir = "roles"\nagents_dir = ".agents/roles"\n')
+
+    config = load_config(config_path)
+    assert config.roles_dir == "roles"
+    assert config.agents_dir == "roles"

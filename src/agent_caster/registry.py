@@ -120,8 +120,8 @@ def find_agents_dir(repo_path: Path) -> Path:
     """Find agent definitions directory in a fetched repo.
 
     Priority:
-    1. roles.toml agents_dir setting  (canonical)
-    2. refit.toml agents_dir setting  (legacy — deprecated)
+    1. roles.toml roles_dir / agents_dir setting
+    2. refit.toml roles_dir / agents_dir setting  (legacy — deprecated)
     3. roles/ directory
     """
     _CANONICAL = "roles.toml"
@@ -133,9 +133,10 @@ def find_agents_dir(repo_path: Path) -> Path:
         if config_path.is_file():
             with open(config_path, "rb") as f:
                 data = tomllib.load(f)
-            agents_dir_name = data.get("project", {}).get("agents_dir")
-            if agents_dir_name:
-                agents_dir = repo_path / agents_dir_name
+            project = data.get("project", {})
+            roles_dir_name = project.get("roles_dir") or project.get("agents_dir")
+            if roles_dir_name:
+                agents_dir = repo_path / roles_dir_name
                 if agents_dir.is_dir():
                     return agents_dir
             break  # found a config file (even if agents_dir key was absent) — stop looking

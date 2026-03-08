@@ -180,6 +180,27 @@ def test_cast_with_target(tmp_path):
     assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
 
 
+def test_render_alias_with_target(tmp_path):
+    agents_dir = tmp_path / ".agents" / "roles"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "explorer.md").write_text(
+        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+    )
+    result = runner.invoke(
+        app,
+        [
+            "render",
+            "--target",
+            "claude",
+            "--project-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0
+    assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
+
+
 def test_cast_no_agents(tmp_path):
     result = runner.invoke(
         app,

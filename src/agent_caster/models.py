@@ -113,8 +113,15 @@ class TargetConfig(BaseModel, frozen=True):
 class ProjectConfig(BaseModel, frozen=True):
     """Full parsed roles.toml configuration."""
 
-    agents_dir: str = ".agents/roles"
+    model_config = ConfigDict(populate_by_name=True)
+
+    roles_dir: str = Field(default=".agents/roles", alias="agents_dir")
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
+
+    @property
+    def agents_dir(self) -> str:
+        """Backward-compatible alias for legacy config terminology."""
+        return self.roles_dir
 
 
 class OutputFile(BaseModel, frozen=True):

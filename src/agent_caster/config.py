@@ -46,14 +46,14 @@ def load_config(config_path: Path) -> ProjectConfig:
         data = tomllib.load(f)
 
     project = data.get("project", {})
-    agents_dir = project.get("agents_dir", ".agents/roles")
+    roles_dir = project.get("roles_dir") or project.get("agents_dir", ".agents/roles")
 
     raw_targets = data.get("targets", {})
     targets = {}
     for name, raw in raw_targets.items():
         targets[name] = _parse_target(name, raw)
 
-    return ProjectConfig(agents_dir=agents_dir, targets=targets)
+    return ProjectConfig(roles_dir=roles_dir, targets=targets)
 
 
 def _parse_target(name: str, raw: dict) -> TargetConfig:

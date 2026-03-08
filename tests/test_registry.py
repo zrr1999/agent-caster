@@ -116,8 +116,8 @@ def test_fetch_github_pulls_existing_cache(mock_run, tmp_path):
 
 
 def test_find_agents_dir_with_roles_toml(tmp_path):
-    """roles.toml agents_dir is honoured (canonical name)."""
-    (tmp_path / "roles.toml").write_text('[project]\nagents_dir = "my-agents"')
+    """roles.toml roles_dir is honoured (canonical name)."""
+    (tmp_path / "roles.toml").write_text('[project]\nroles_dir = "my-agents"')
     agents = tmp_path / "my-agents"
     agents.mkdir()
     (agents / "test.md").write_text("---\nname: test\n---\n")
@@ -129,6 +129,17 @@ def test_find_agents_dir_with_roles_toml(tmp_path):
 def test_find_agents_dir_with_refit_toml(tmp_path):
     """Legacy refit.toml agents_dir still works for backward compatibility."""
     (tmp_path / "refit.toml").write_text('[project]\nagents_dir = "my-agents"')
+    agents = tmp_path / "my-agents"
+    agents.mkdir()
+    (agents / "test.md").write_text("---\nname: test\n---\n")
+
+    result = find_agents_dir(tmp_path)
+    assert result == agents
+
+
+def test_find_agents_dir_with_legacy_agents_dir_key(tmp_path):
+    """roles.toml agents_dir remains supported for backward compatibility."""
+    (tmp_path / "roles.toml").write_text('[project]\nagents_dir = "my-agents"')
     agents = tmp_path / "my-agents"
     agents.mkdir()
     (agents / "test.md").write_text("---\nname: test\n---\n")

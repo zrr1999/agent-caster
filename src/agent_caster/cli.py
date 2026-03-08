@@ -9,10 +9,11 @@ from typing import Annotated
 import typer
 
 from agent_caster import __version__
+from agent_caster.adapters import list_adapters
 from agent_caster.log import logger
 
 app = typer.Typer(
-    help="agent-caster: AI coding agent definition manager. Fetch, install, and cast across tools."
+    help=("agent-caster: install canonical role definitions and render them across coding tools.")
 )
 
 
@@ -29,7 +30,7 @@ def main(
         typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version"),
     ] = None,
 ) -> None:
-    """agent-caster: AI coding agent definition manager."""
+    """agent-caster: install canonical role definitions and render them across tools."""
 
 
 def _resolve_target_config(
@@ -78,6 +79,29 @@ def _resolve_target_config(
     raise typer.Exit(1)
 
 
+def _render_agents_to_targets(project: Path, agents, target_names: list[str]) -> None:
+    from agent_caster.adapters import get_adapter
+    from agent_caster.topology import TopologyError
+
+    for target_name in target_names:
+        try:
+            adapter = get_adapter(target_name)
+        except ValueError as e:
+            logger.error(str(e))
+            continue
+
+        config = _resolve_target_config(target_name, adapter, project)
+
+        try:
+            outputs = adapter.cast(agents, config)
+        except TopologyError as e:
+            logger.error(str(e))
+            raise typer.Exit(1) from e
+
+        _write_outputs(project, outputs, config.output_dir)
+        logger.info(f"Rendered {len(outputs)} roles -> {target_name}")
+
+
 def _write_outputs(project: Path, outputs, output_dir: str) -> None:
     """Write cast outputs beneath the configured output_dir."""
     for out in outputs:
@@ -119,7 +143,6 @@ def add(
     ] = None,
 ) -> None:
     """Add agent definitions from a source."""
-    from agent_caster.adapters import get_adapter
     from agent_caster.loader import load_agents
     from agent_caster.platform import detect_platforms
     from agent_caster.registry import fetch_source, find_agents_dir, parse_source
@@ -185,22 +208,7 @@ def add(
 
     installed_agents = load_agents(install_dir)
     for target_name in cast_targets:
-        try:
-            adapter = get_adapter(target_name)
-        except ValueError:
-            logger.error(f"Unknown target: {target_name}")
-            continue
-
-        config = _resolve_target_config(target_name, adapter, project)
-
-        try:
-            outputs = adapter.cast(installed_agents, config)
-        except TopologyError as e:
-            logger.error(str(e))
-            raise typer.Exit(1) from e
-        _write_outputs(project, outputs, config.output_dir)
-
-        logger.info(f"Cast {len(outputs)} agents → {target_name}")
+        _render_agents_to_targets(project, installed_agents, [target_name])
 
 
 @app.command("list")
@@ -233,8 +241,7 @@ def list_agents(
     logger.info(f"\n{len(agents)} agents found")
 
 
-@app.command()
-def cast(
+def _render_command(
     target: Annotated[
         list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
     ] = None,
@@ -242,8 +249,7 @@ def cast(
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Cast installed agent definitions to platform-specific configs."""
-    from agent_caster.adapters import get_adapter
+    """Render installed role definitions to platform-specific configs."""
     from agent_caster.loader import load_agents
     from agent_caster.platform import detect_platforms
     from agent_caster.topology import TopologyError, validate_agents
@@ -264,26 +270,38 @@ def cast(
     cast_targets = list(target) if target else detect_platforms(project)
 
     if not cast_targets:
-        logger.error("No platforms detected. Use --target to specify.")
+        logger.error(
+            f"No platforms detected. Use --target to specify one of: {', '.join(list_adapters())}"
+        )
         raise typer.Exit(1)
 
-    for target_name in cast_targets:
-        try:
-            adapter = get_adapter(target_name)
-        except ValueError as e:
-            logger.error(str(e))
-            continue
+    _render_agents_to_targets(project, agents, cast_targets)
 
-        config = _resolve_target_config(target_name, adapter, project)
 
-        try:
-            outputs = adapter.cast(agents, config)
-        except TopologyError as e:
-            logger.error(str(e))
-            raise typer.Exit(1) from e
-        _write_outputs(project, outputs, config.output_dir)
+@app.command()
+def render(
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
+    ] = None,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Render installed role definitions to platform-specific configs."""
+    _render_command(target=target, project_dir=project_dir)
 
-        logger.info(f"Cast {len(outputs)} agents → {target_name}")
+
+@app.command()
+def cast(
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
+    ] = None,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Legacy alias for `render`."""
+    _render_command(target=target, project_dir=project_dir)
 
 
 @app.command()
@@ -308,7 +326,7 @@ def remove(
     agent_file.unlink()
     logger.info(f"Removed {agent.canonical_id}")
     logger.info(
-        "Note: platform-specific files may still exist. Run 'agent-caster cast' to regenerate."
+        "Note: platform-specific files may still exist. Run 'agent-caster render' to regenerate."
     )
 
 

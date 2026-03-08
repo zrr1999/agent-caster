@@ -23,21 +23,20 @@ just pre-commit    # 运行 pre-commit 钩子
 
 ```
 src/agent_caster/
-├── cli.py          # CLI 入口（init / cast / list）
-├── config.py       # refit.toml 解析
-├── loader.py       # Agent 定义加载（YAML frontmatter + Markdown）
+├── cli.py          # CLI 入口（add / update / render / list / remove）
+├── config.py       # roles.toml / refit.toml 解析
+├── loader.py       # Role 定义加载（YAML frontmatter + Markdown）
 ├── models.py       # Pydantic 数据模型
 ├── groups.py       # Capability group 和 bash policy 定义
-├── caster.py       # Cast 编译管线
-└── adapters/       # 平台适配器
-    ├── base.py     # Adapter Protocol
-    ├── claude.py   # Claude Code 适配器
-    └── opencode.py # OpenCode 适配器
+├── registry.py     # GitHub source 获取和 roles_dir 发现
+├── platform.py     # 平台检测
+├── topology.py     # hierarchy / delegation / output layout 校验
+└── adapters/       # 平台适配器和 entry point 注册
 ```
 
 ## 添加新适配器
 
-1. 在 `src/agent_caster/adapters/` 下创建新模块，实现 `Adapter` Protocol
-2. 在 `adapters/__init__.py` 的 `_REGISTRY` 中注册
+1. 在 `src/agent_caster/adapters/` 下创建新模块，继承 `BaseAdapter`
+2. 在 `adapters/__init__.py` 的内置 registry 中注册，或通过 entry point 提供第三方 adapter
 3. 在 `pyproject.toml` 的 `[project.entry-points."agent_caster.adapters"]` 中注册
 4. 在 `tests/` 下添加对应的 snapshot 测试
