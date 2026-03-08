@@ -16,15 +16,10 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
+agent-caster = "role_forge.legacy_cli:main"
 role-forge = "role_forge.cli:app"
-agent-caster = "role_forge.cli:app"
 
 [project.entry-points."role_forge.adapters"]
-opencode = "role_forge.adapters.opencode:OpenCodeAdapter"
-claude = "role_forge.adapters.claude:ClaudeAdapter"
-cursor = "role_forge.adapters.cursor:CursorAdapter"
-
-[project.entry-points."agent_caster.adapters"]
 opencode = "role_forge.adapters.opencode:OpenCodeAdapter"
 claude = "role_forge.adapters.claude:ClaudeAdapter"
 cursor = "role_forge.adapters.cursor:CursorAdapter"
@@ -49,7 +44,7 @@ addopts = ["--strict-markers", "--tb=short"]
 
 [tool.coverage.run]
 branch = true
-source = ["agent_caster", "role_forge"]
+source = ["role_forge"]
 omit = ["*/tests/*"]
 
 [tool.coverage.report]
@@ -90,7 +85,7 @@ select = [
 ignore = ["PGH003", "B008"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agent_caster", "role_forge"]
+known-first-party = ["role_forge"]
 required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.per-file-ignores]
@@ -110,7 +105,7 @@ source = "vcs"
 version-file = "src/role_forge/_version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_caster", "src/role_forge"]
+packages = ["src/role_forge"]
 
 [tool.uv]
 default-groups = ["dev"]

@@ -8,7 +8,7 @@ AI coding agent 工具（Claude Code、OpenCode、Cursor、Codex、Windsurf、Ai
 
 **role-forge** 让你从 GitHub 安装可复用的 role definitions，并把同一份 canonical source render 成各工具需要的格式。
 
-兼容迁移期内，旧命令 `agent-caster` 和旧 Python 包名 `agent_caster` 仍可继续使用。
+旧命令 `agent-caster` 只保留最小提示，用于引导迁移到 `role-forge`。
 
 | 能力 | 支持 |
 |------|:---:|
@@ -126,8 +126,8 @@ CLI 中 `cast` 仍可用，但 `render` 是推荐名称。
 ## Migration
 
 - 新名字：`role-forge`
-- 兼容 CLI：`agent-caster`
-- 兼容 Python import：`agent_caster`
+- 旧 CLI：`agent-caster`（仅输出迁移提示）
+- 旧 Python import：不再保留
 
 推荐新集成逐步迁移到：
 

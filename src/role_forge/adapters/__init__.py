@@ -33,9 +33,8 @@ def list_adapters() -> list[str]:
 
 def _all_adapters() -> dict[str, type[BaseAdapter]]:
     adapters = dict(BUILTIN_ADAPTERS)
-    for group in ("role_forge.adapters", "agent_caster.adapters"):
-        for entry_point in entry_points(group=group):
-            loaded = entry_point.load()
-            if isinstance(loaded, type):
-                adapters.setdefault(entry_point.name, loaded)
+    for entry_point in entry_points(group="role_forge.adapters"):
+        loaded = entry_point.load()
+        if isinstance(loaded, type):
+            adapters.setdefault(entry_point.name, loaded)
     return adapters

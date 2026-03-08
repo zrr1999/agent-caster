@@ -73,9 +73,9 @@ just ci        # 完整 CI 流程（format + lint + check + test）
 
 ## 添加新适配器
 
-1. 在 `src/agent_caster/adapters/` 下创建新模块，继承 `BaseAdapter`
+1. 在 `src/role_forge/adapters/` 下创建新模块，继承 `BaseAdapter`
 2. 在 `adapters/__init__.py` 中注册内置 adapter，或以第三方包形式暴露 entry point
-3. 在 `pyproject.toml` 的 `[project.entry-points."role_forge.adapters"]` 中注册；旧的 `agent_caster.adapters` 也继续兼容
+3. 在 `pyproject.toml` 的 `[project.entry-points."role_forge.adapters"]` 中注册
 4. 在 `tests/` 下添加对应的 snapshot 测试
 
 ## 版本管理

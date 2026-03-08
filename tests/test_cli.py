@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+from contextlib import redirect_stdout
+from io import StringIO
+
 from typer.testing import CliRunner
 
 from role_forge.cli import app
+from role_forge.legacy_cli import main as legacy_main
 
 runner = CliRunner()
 
@@ -13,6 +18,26 @@ def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "role-forge" in result.output
+
+
+def test_legacy_cli_shows_rename_hint():
+    buffer = StringIO()
+    original_argv = list(sys.argv)
+    try:
+        sys.argv = ["agent-caster", "render", "--target", "claude"]
+        with redirect_stdout(buffer):
+            try:
+                legacy_main()
+            except SystemExit as exc:
+                assert exc.code == 1
+            else:
+                raise AssertionError("legacy_main() should exit")
+    finally:
+        sys.argv = original_argv
+
+    output = buffer.getvalue()
+    assert "renamed to `role-forge`" in output
+    assert "role-forge render --target claude" in output
 
 
 # -- add command ---------------------------------------------------------------
