@@ -44,7 +44,7 @@ class AgentDef(BaseModel, frozen=True):
 
     name: str
     description: str = ""
-    role: Literal["primary", "subagent"] = "subagent"
+    role: Literal["primary", "subagent", "all"] = "subagent"
     model: ModelConfig = ModelConfig()
     skills: list[str] = Field(default_factory=list)
     capabilities: list[str | dict[str, Any]] = Field(default_factory=list)
