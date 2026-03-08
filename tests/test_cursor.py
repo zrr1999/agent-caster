@@ -86,6 +86,13 @@ def test_output_path_uses_agent_name():
     assert outputs[0].path == ".cursor/agents/my-agent.mdc"
 
 
+def test_output_path_preserves_relative_role_path():
+    agent = AgentDef(name="worker", description="Test", relative_path="l3/worker.md")
+    adapter = CursorAdapter()
+    outputs = adapter.cast([agent], CURSOR_CONFIG)
+    assert outputs[0].path == ".cursor/agents/l3/worker.mdc"
+
+
 def test_model_map_ignored():
     """Cursor adapter ignores model_map — Cursor selects model globally."""
     config_with_model = TargetConfig(

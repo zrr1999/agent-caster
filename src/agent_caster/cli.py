@@ -78,6 +78,32 @@ def _resolve_target_config(
     raise typer.Exit(1)
 
 
+def _write_outputs(project: Path, outputs, output_dir: str) -> None:
+    """Write cast outputs beneath the configured output_dir."""
+    for out in outputs:
+        full_path = (project / output_dir / out.path).resolve()
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(out.content, encoding="utf-8")
+
+
+def _resolve_remove_target(agents, ref: str):
+    """Resolve a remove reference by canonical id first, then by unique name."""
+    by_id = {agent.canonical_id: agent for agent in agents}
+    if ref in by_id:
+        return by_id[ref]
+
+    matches = [agent for agent in agents if agent.name == ref]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        choices = ", ".join(agent.canonical_id for agent in matches)
+        logger.error(f"Ambiguous agent name '{ref}'. Use one of: {choices}")
+        raise typer.Exit(1)
+
+    logger.error(f"Agent not found: {ref}")
+    raise typer.Exit(1)
+
+
 @app.command()
 def add(
     source: Annotated[str, typer.Argument(help="Source: org/repo[@ref] or local path")],
@@ -97,6 +123,7 @@ def add(
     from agent_caster.loader import load_agents
     from agent_caster.platform import detect_platforms
     from agent_caster.registry import fetch_source, find_agents_dir, parse_source
+    from agent_caster.topology import TopologyError, validate_agents
 
     parsed = parse_source(source)
 
@@ -116,10 +143,15 @@ def add(
     if not agents:
         logger.error("No agent definitions found in source.")
         raise typer.Exit(1)
+    try:
+        validate_agents(agents)
+    except TopologyError as e:
+        logger.error(str(e))
+        raise typer.Exit(1) from e
 
     logger.info(f"Found {len(agents)} agents:")
     for a in agents:
-        logger.info(f"  {a.name:<25} {a.role:<10} {a.model.tier}")
+        logger.info(f"  {a.canonical_id:<25} {a.role:<10} {a.model.tier}")
 
     # Determine install target
     if global_install:
@@ -133,9 +165,10 @@ def add(
     # Copy agent files
     for a in agents:
         if a.source_path:
-            dest = install_dir / a.source_path.name
+            dest = install_dir / a.install_relative_path()
+            dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(a.source_path, dest)
-            logger.info(f"  Installed {a.name}")
+            logger.info(f"  Installed {a.canonical_id}")
 
     logger.info(f"\nInstalled {len(agents)} agents to {install_dir}")
 
@@ -160,11 +193,12 @@ def add(
 
         config = _resolve_target_config(target_name, adapter, project)
 
-        outputs = adapter.cast(installed_agents, config)
-        for out in outputs:
-            full_path = project / out.path
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path.write_text(out.content, encoding="utf-8")
+        try:
+            outputs = adapter.cast(installed_agents, config)
+        except TopologyError as e:
+            logger.error(str(e))
+            raise typer.Exit(1) from e
+        _write_outputs(project, outputs, config.output_dir)
 
         logger.info(f"Cast {len(outputs)} agents → {target_name}")
 
@@ -187,11 +221,14 @@ def list_agents(
 
     agents = load_agents(agents_dir)
 
-    logger.info(f"{'AGENT':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
-    logger.info("-" * 55)
+    logger.info(f"{'AGENT':<25} {'ID':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
+    logger.info("-" * 82)
     for agent in agents:
         temp = str(agent.model.temperature) if agent.model.temperature is not None else "-"
-        logger.info(f"{agent.name:<25} {agent.role:<10} {agent.model.tier:<12} {temp:<6}")
+        logger.info(
+            f"{agent.name:<25} {agent.canonical_id:<25} {agent.role:<10} "
+            f"{agent.model.tier:<12} {temp:<6}"
+        )
 
     logger.info(f"\n{len(agents)} agents found")
 
@@ -209,6 +246,7 @@ def cast(
     from agent_caster.adapters import get_adapter
     from agent_caster.loader import load_agents
     from agent_caster.platform import detect_platforms
+    from agent_caster.topology import TopologyError, validate_agents
 
     project = Path(project_dir).resolve() if project_dir else Path.cwd()
     agents_dir = project / ".agents" / "roles"
@@ -218,6 +256,11 @@ def cast(
         raise typer.Exit(1)
 
     agents = load_agents(agents_dir)
+    try:
+        validate_agents(agents)
+    except TopologyError as e:
+        logger.error(str(e))
+        raise typer.Exit(1) from e
     cast_targets = list(target) if target else detect_platforms(project)
 
     if not cast_targets:
@@ -233,34 +276,37 @@ def cast(
 
         config = _resolve_target_config(target_name, adapter, project)
 
-        outputs = adapter.cast(agents, config)
-        for out in outputs:
-            full_path = project / out.path
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path.write_text(out.content, encoding="utf-8")
+        try:
+            outputs = adapter.cast(agents, config)
+        except TopologyError as e:
+            logger.error(str(e))
+            raise typer.Exit(1) from e
+        _write_outputs(project, outputs, config.output_dir)
 
         logger.info(f"Cast {len(outputs)} agents → {target_name}")
 
 
 @app.command()
 def remove(
-    agent_name: Annotated[str, typer.Argument(help="Agent name to remove")],
+    agent_name: Annotated[str, typer.Argument(help="Agent canonical id or unique name to remove")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
     """Remove an installed agent definition."""
+    from agent_caster.loader import load_agents
+
     project = Path(project_dir).resolve() if project_dir else Path.cwd()
     agents_dir = project / ".agents" / "roles"
-    agent_file = agents_dir / f"{agent_name}.md"
-
-    if not agent_file.is_file():
-        logger.error(f"Agent not found: {agent_name}")
+    if not agents_dir.is_dir():
+        logger.error("No agents found. Run 'agent-caster add' first.")
         raise typer.Exit(1)
 
+    agent = _resolve_remove_target(load_agents(agents_dir), agent_name)
+    agent_file = agents_dir / agent.install_relative_path()
     agent_file.unlink()
-    logger.info(f"Removed {agent_name}")
+    logger.info(f"Removed {agent.canonical_id}")
     logger.info(
         "Note: platform-specific files may still exist. Run 'agent-caster cast' to regenerate."
     )

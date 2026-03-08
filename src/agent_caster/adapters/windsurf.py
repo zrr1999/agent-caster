@@ -35,6 +35,7 @@ Notes:
 from __future__ import annotations
 
 from agent_caster.models import AgentDef, BaseAdapter, OutputFile, TargetConfig
+from agent_caster.topology import build_output_path, validate_agents, validate_output_layout
 
 TRIGGER = "model_decision"
 
@@ -47,10 +48,13 @@ class WindsurfAdapter(BaseAdapter):
         agents: list[AgentDef],
         config: TargetConfig,
     ) -> list[OutputFile]:
+        validate_agents(agents)
+        validate_output_layout(agents, config)
+
         outputs = []
         for agent in agents:
             content = self._generate_rule(agent)
-            path = f".windsurf/rules/{agent.name}.md"
+            path = build_output_path(agent, base_dir=".windsurf/rules", suffix=".md", config=config)
             outputs.append(OutputFile(path=path, content=content))
         return outputs
 

@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+from pydantic import ValidationError
 
 from agent_caster.log import logger
-from agent_caster.models import AgentDef, ModelConfig
+from agent_caster.models import AgentDef, HierarchyConfig, ModelConfig
 
 
 class LoadError(Exception):
@@ -31,7 +32,7 @@ def load_agents(agents_dir: Path, *, strict: bool = False) -> list[AgentDef]:
     for md_path in sorted(agents_dir.rglob("*.md")):
         logger.debug(f"Loading agent from {md_path.relative_to(agents_dir)}")
         try:
-            agents.append(parse_agent_file(md_path))
+            agents.append(parse_agent_file(md_path, agents_dir=agents_dir))
         except LoadError as exc:
             if strict:
                 raise
@@ -40,7 +41,7 @@ def load_agents(agents_dir: Path, *, strict: bool = False) -> list[AgentDef]:
     return agents
 
 
-def parse_agent_file(md_path: Path) -> AgentDef:
+def parse_agent_file(md_path: Path, *, agents_dir: Path | None = None) -> AgentDef:
     """Parse a single agent definition file."""
     text = md_path.read_text(encoding="utf-8")
     fm_text, body = _split_frontmatter(text)
@@ -56,20 +57,31 @@ def parse_agent_file(md_path: Path) -> AgentDef:
         tier=raw_model.get("tier", "reasoning"),
         temperature=raw_model.get("temperature"),
     )
+    hierarchy = _parse_hierarchy(defn)
 
     prompt_content = _resolve_prompt(defn, body, md_path.parent)
-
-    return AgentDef(
-        name=defn["name"],
-        description=(defn.get("description", "") or "").strip(),
-        role=defn.get("role", "subagent"),
-        model=model,
-        skills=defn.get("skills", []) or [],
-        capabilities=defn.get("capabilities", []) or [],
-        prompt_content=prompt_content,
-        prompt_file=defn.get("prompt_file"),
-        source_path=md_path.resolve(),
+    relative_path = (
+        md_path.resolve().relative_to(agents_dir.resolve()).as_posix()
+        if agents_dir is not None
+        else md_path.name
     )
+
+    try:
+        return AgentDef(
+            name=defn["name"],
+            description=(defn.get("description", "") or "").strip(),
+            role=defn.get("role", "subagent"),
+            model=model,
+            skills=defn.get("skills", []) or [],
+            capabilities=defn.get("capabilities", []) or [],
+            hierarchy=hierarchy,
+            prompt_content=prompt_content,
+            prompt_file=defn.get("prompt_file"),
+            source_path=md_path.resolve(),
+            relative_path=relative_path,
+        )
+    except ValidationError as exc:
+        raise LoadError(f"Invalid agent metadata in {md_path}: {exc}") from exc
 
 
 def _split_frontmatter(text: str) -> tuple[str, str]:
@@ -94,3 +106,27 @@ def _resolve_prompt(defn: dict, body: str, file_dir: Path) -> str:
             return prompt_path.read_text(encoding="utf-8")
         return ""
     return body
+
+
+def _parse_hierarchy(defn: dict) -> HierarchyConfig:
+    """Parse first-class hierarchy metadata from top-level or nested keys."""
+    raw_hierarchy = defn.get("hierarchy", {}) or {}
+    if raw_hierarchy and not isinstance(raw_hierarchy, dict):
+        raise LoadError("Field 'hierarchy' must be a mapping when provided")
+
+    merged = dict(raw_hierarchy)
+    for key in (
+        "level",
+        "class",
+        "scheduled",
+        "callable",
+        "max_delegate_depth",
+        "allowed_children",
+    ):
+        if key in defn:
+            merged[key] = defn[key]
+
+    try:
+        return HierarchyConfig.model_validate(merged)
+    except ValidationError as exc:
+        raise LoadError(f"Invalid hierarchy metadata: {exc}") from exc

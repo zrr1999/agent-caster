@@ -101,6 +101,40 @@ def test_add_with_explicit_target(tmp_path):
     assert (project / ".claude" / "agents" / "explorer.md").is_file()
 
 
+def test_add_preserves_nested_role_paths_and_cast_output(tmp_path):
+    source = tmp_path / "source"
+    roles = source / "roles"
+    (roles / "l2").mkdir(parents=True)
+    (roles / "l3").mkdir(parents=True)
+    (roles / "l2" / "lead.md").write_text(
+        "---\nname: lead\ndescription: Lead\nrole: subagent\nlevel: L2\n---\n# Lead\n"
+    )
+    (roles / "l3" / "worker.md").write_text(
+        "---\nname: worker\ndescription: Worker\nrole: subagent\nlevel: L3\n---\n# Worker\n"
+    )
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            str(source),
+            "--yes",
+            "--target",
+            "claude",
+            "--project-dir",
+            str(project),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (project / ".agents" / "roles" / "l2" / "lead.md").is_file()
+    assert (project / ".agents" / "roles" / "l3" / "worker.md").is_file()
+    assert (project / ".claude" / "agents" / "l2" / "lead.md").is_file()
+    assert (project / ".claude" / "agents" / "l3" / "worker.md").is_file()
+
+
 # -- list command --------------------------------------------------------------
 
 
@@ -114,6 +148,7 @@ def test_list_agents(tmp_path):
     result = runner.invoke(app, ["list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0
     assert "explorer" in result.output
+    assert "ID" in result.output
 
 
 def test_list_no_agents(tmp_path):
@@ -178,6 +213,46 @@ def test_remove_agent(tmp_path):
     )
     assert result.exit_code == 0
     assert not (agents_dir / "explorer.md").exists()
+
+
+def test_remove_nested_agent_by_canonical_id(tmp_path):
+    agents_dir = tmp_path / ".agents" / "roles" / "l2"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "worker.md").write_text("---\nname: worker\n---\n# E")
+
+    result = runner.invoke(
+        app,
+        [
+            "remove",
+            "l2/worker",
+            "--yes",
+            "--project-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0
+    assert not (agents_dir / "worker.md").exists()
+
+
+def test_remove_ambiguous_name_requires_canonical_id(tmp_path):
+    left = tmp_path / ".agents" / "roles" / "l2"
+    right = tmp_path / ".agents" / "roles" / "l3"
+    left.mkdir(parents=True)
+    right.mkdir(parents=True)
+    (left / "worker.md").write_text("---\nname: worker\n---\n# L2")
+    (right / "worker.md").write_text("---\nname: worker\n---\n# L3")
+
+    result = runner.invoke(
+        app,
+        [
+            "remove",
+            "worker",
+            "--project-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Ambiguous agent name" in result.output
 
 
 def test_remove_nonexistent(tmp_path):
@@ -357,6 +432,55 @@ def test_cast_uses_refit_toml_config(tmp_path):
     assert agent_file.is_file()
     content = agent_file.read_text()
     assert "toml-coding" in content
+
+
+def test_cast_namespace_layout_avoids_nested_name_collisions(tmp_path):
+    agents_dir = tmp_path / ".agents" / "roles"
+    (agents_dir / "l2").mkdir(parents=True)
+    (agents_dir / "l3").mkdir(parents=True)
+    (agents_dir / "l2" / "worker.md").write_text(
+        "---\nname: worker\ndescription: L2 worker\n---\n# L2 Worker\n"
+    )
+    (agents_dir / "l3" / "worker.md").write_text(
+        "---\nname: worker\ndescription: L3 worker\n---\n# L3 Worker\n"
+    )
+    (tmp_path / "roles.toml").write_text(
+        "[targets.claude]\n"
+        'output_layout = "namespace"\n'
+        "[targets.claude.model_map]\n"
+        'reasoning = "opus"\n'
+        'coding = "sonnet"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["cast", "--target", "claude", "--project-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".claude" / "agents" / "l2__worker.md").is_file()
+    assert (tmp_path / ".claude" / "agents" / "l3__worker.md").is_file()
+
+
+def test_cast_flatten_layout_rejects_nested_name_collisions(tmp_path):
+    agents_dir = tmp_path / ".agents" / "roles"
+    (agents_dir / "l2").mkdir(parents=True)
+    (agents_dir / "l3").mkdir(parents=True)
+    (agents_dir / "l2" / "worker.md").write_text("---\nname: worker\n---\n# L2 Worker\n")
+    (agents_dir / "l3" / "worker.md").write_text("---\nname: worker\n---\n# L3 Worker\n")
+    (tmp_path / "roles.toml").write_text(
+        "[targets.claude]\n"
+        'output_layout = "flatten"\n'
+        "[targets.claude.model_map]\n"
+        'reasoning = "opus"\n'
+        'coding = "sonnet"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["cast", "--target", "claude", "--project-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 1
+    assert "maps both" in result.output
 
 
 def test_add_opencode_prompts_for_model(tmp_path):

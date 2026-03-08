@@ -21,7 +21,14 @@ def test_cast_aligner_no_bash(sample_aligner, opencode_config, snapshot):
 
 def test_cast_orchestrator_with_delegates(sample_orchestrator, opencode_config, snapshot):
     adapter = OpenCodeAdapter()
-    outputs = adapter.cast([sample_orchestrator], opencode_config)
+    outputs = adapter.cast(
+        [
+            sample_orchestrator,
+            AgentDef(name="explorer", description="Explorer"),
+            AgentDef(name="aligner", description="Aligner"),
+        ],
+        opencode_config,
+    )
     assert outputs[0].content == snapshot
 
 
@@ -194,3 +201,34 @@ def test_custom_tier_overrides_if_in_model_map():
     adapter = OpenCodeAdapter()
     resolved = adapter._resolve_model(agent.model, config.model_map)
     assert resolved == "model-ultra"
+
+
+def test_cast_nested_agent_preserves_relative_path(opencode_config):
+    agent = AgentDef(name="scout", description="Scout", relative_path="l2/scout.md")
+    adapter = OpenCodeAdapter()
+    outputs = adapter.cast([agent], opencode_config)
+    assert outputs[0].path == ".opencode/agents/l2/scout.md"
+
+
+def test_cast_namespace_layout_uses_namespaced_task_permissions() -> None:
+    adapter = OpenCodeAdapter()
+    config = TargetConfig(
+        name="opencode",
+        output_layout="namespace",
+        model_map={"reasoning": "model-r", "coding": "model-c"},
+    )
+    agents = [
+        AgentDef(
+            name="orchestrator",
+            description="Orchestrator",
+            role="primary",
+            relative_path="l1/orchestrator.md",
+            capabilities=[{"delegate": ["worker"]}],
+        ),
+        AgentDef(name="worker", description="Worker", relative_path="l3/worker.md"),
+    ]
+
+    outputs = adapter.cast(agents, config)
+    by_path = {output.path: output.content for output in outputs}
+    assert ".opencode/agents/l1__orchestrator.md" in by_path
+    assert '"l3__worker": allow' in by_path[".opencode/agents/l1__orchestrator.md"]
