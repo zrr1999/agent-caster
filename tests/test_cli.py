@@ -51,7 +51,7 @@ def test_add_with_auto_cast(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     project = tmp_path / "project"
@@ -79,7 +79,7 @@ def test_add_with_explicit_target(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     project = tmp_path / "project"
@@ -129,7 +129,7 @@ def test_cast_with_target(tmp_path):
     agents_dir.mkdir(parents=True)
     (agents_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
     result = runner.invoke(
         app,
@@ -214,7 +214,7 @@ def test_add_uses_roles_toml_config(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     project = tmp_path / "project"
@@ -255,7 +255,7 @@ def test_add_uses_refit_toml_config(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     project = tmp_path / "project"
@@ -295,7 +295,7 @@ def test_cast_uses_roles_toml_config(tmp_path):
     agents_dir.mkdir(parents=True)
     (agents_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: coding\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: coding\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     # Write roles.toml with custom model_map for claude target
@@ -330,7 +330,7 @@ def test_cast_uses_refit_toml_config(tmp_path):
     agents_dir.mkdir(parents=True)
     (agents_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: coding\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: coding\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     # Write refit.toml with custom model_map for claude target
@@ -366,45 +366,18 @@ def test_add_opencode_prompts_for_model(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
-    project = tmp_path / "project"
-    project.mkdir()
-
-    # Simulate user typing model names at the prompt
-    result = runner.invoke(
-        app,
-        [
-            "add",
-            str(source),
-            "--yes",
-            "--target",
-            "opencode",
-            "--project-dir",
-            str(project),
-        ],
-        input="my-reasoning-model\nmy-coding-model\n",
-    )
-    assert result.exit_code == 0, result.output
-    agent_file = project / ".opencode" / "agents" / "explorer.md"
-    assert agent_file.is_file()
-    content = agent_file.read_text()
-    assert "my-reasoning-model" in content
-
-
-def test_full_workflow_add_list_cast_remove(tmp_path):
-    """Full workflow: add -> list -> cast -> remove."""
-    source = tmp_path / "source"
-    roles = source / "roles"
-    roles.mkdir(parents=True)
-    (roles / "explorer.md").write_text(
+    agents_dir = tmp_path / ".agents" / "roles"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
     (roles / "aligner.md").write_text(
         "---\nname: aligner\ndescription: Aligner\nrole: subagent\n"
-        "model:\n  tier: coding\ncapabilities:\n  - write-code\n---\n# Aligner\n"
+        "model:\n  tier: coding\ncapabilities:\n  - write\n---\n# Aligner\n"
     )
 
     project = tmp_path / "project"

@@ -29,6 +29,7 @@ Repository = "https://github.com/zrr1999/agent-caster"
 
 [dependency-groups]
 dev = [
+  "ruff>=0.15.5",
   { include-group = "test" },
 ]
 test = [
