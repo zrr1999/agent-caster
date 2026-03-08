@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import ClassVar
 
 from role_forge.adapters.base import BaseAdapter
-from role_forge.groups import ALL_TOOL_IDS, BASH_POLICIES, TOOL_GROUPS
+from role_forge.capabilities import CapabilitySpec, expand_capabilities
+from role_forge.groups import ALL_TOOL_IDS
 from role_forge.models import AgentDef, TargetConfig
 
 # Semantic tool id -> Claude Code tool name
@@ -43,55 +44,8 @@ class ClaudeAdapter(BaseAdapter):
         self,
         capabilities: list[str | dict],
         capability_map: dict[str, dict[str, bool]],
-    ) -> tuple[list[str], list[str], list[str]]:
-        """Expand raw capabilities into Claude tool names, bash patterns, delegates.
-
-        Bash policy groups (safe-bash, readonly-bash) and explicit ``bash: [...]``
-        entries are **merged** — the final whitelist is the union of all patterns.
-        """
-        tools: set[str] = set()
-        bash_patterns: list[str] = []
-        delegates: list[str] = []
-
-        for cap in capabilities:
-            if isinstance(cap, str):
-                # Bash policy group
-                if cap in BASH_POLICIES:
-                    bash_patterns.extend(BASH_POLICIES[cap])
-                elif cap == "all":
-                    tools.update(_ALL_CLAUDE_TOOLS)
-                    tools.add("Bash")
-                # Built-in tool group
-                elif cap in TOOL_GROUPS:
-                    for tool_id in TOOL_GROUPS[cap]:
-                        claude_name = _TOOL_NAME_MAP.get(tool_id)
-                        if claude_name:
-                            tools.add(claude_name)
-                # User-defined capability_map from refit.toml
-                elif cap in capability_map:
-                    for flag in capability_map[cap]:
-                        claude_name = _TOOL_NAME_MAP.get(flag)
-                        if claude_name:
-                            tools.add(claude_name)
-                else:
-                    # Pass through as-is — the platform may support it natively
-                    tools.add(cap)
-            elif isinstance(cap, dict):
-                if "bash" in cap:
-                    bash_patterns.extend(cap["bash"] or [])
-                if "delegate" in cap:
-                    delegates = cap["delegate"] or []
-
-        # Deduplicate bash patterns while preserving order
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for p in bash_patterns:
-            if p not in seen:
-                seen.add(p)
-                deduped.append(p)
-        bash_patterns = deduped
-
-        return sorted(tools), bash_patterns, delegates
+    ) -> CapabilitySpec:
+        return expand_capabilities(capabilities, capability_map)
 
     def _build_allowed_tools(
         self,
@@ -107,6 +61,8 @@ class ClaudeAdapter(BaseAdapter):
                 if not bash_patterns:
                     allowed.append(tool)
                 continue  # handled via patterns below
+            if tool == "Task" and delegates:
+                continue  # handled via delegate-specific entries below
             allowed.append(tool)
 
         if bash_patterns:
@@ -142,9 +98,9 @@ class ClaudeAdapter(BaseAdapter):
         config: TargetConfig,
         delegates: list[str],
     ) -> str:
-        tools, bash_patterns, _ = self._expand_capabilities(
-            agent.capabilities, config.capability_map
-        )
+        spec = self._expand_capabilities(agent.capabilities, config.capability_map)
+        tools = self._map_tool_ids(spec)
+        bash_patterns = list(spec.bash_patterns)
 
         name = agent.name
         description = agent.description
@@ -153,3 +109,18 @@ class ClaudeAdapter(BaseAdapter):
 
         fm = self._serialize_frontmatter(name, description, model, allowed_tools)
         return self._compose_document(fm, agent.prompt_content)
+
+    def _map_tool_ids(self, spec: CapabilitySpec) -> list[str]:
+        tools: set[str] = set()
+        for tool_id in spec.tool_ids:
+            claude_name = _TOOL_NAME_MAP.get(tool_id)
+            if claude_name:
+                tools.add(claude_name)
+                continue
+            tools.add(tool_id)
+
+        if spec.full_access:
+            tools.update(_ALL_CLAUDE_TOOLS)
+            tools.add("Bash")
+
+        return sorted(tools)

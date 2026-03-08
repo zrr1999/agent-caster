@@ -80,6 +80,13 @@ capabilities:
 
 ## Capability vocabulary
 
+Capabilities are expanded once into a shared, platform-agnostic model before any adapter renders them. That shared expansion tracks:
+
+- tool ids
+- bash allow-lists
+- delegate targets
+- whether a capability implies full built-in access
+
 Preferred canonical names:
 
 - `read`
@@ -94,3 +101,14 @@ Preferred canonical names:
 Legacy aliases such as `read-code` and `write-code` still load, but new definitions should use the canonical names.
 
 `all` expands to every built-in capability the target adapter knows how to express. For adapters with permission maps, it also grants full access for those built-in permissions.
+
+Structured capability entries remain available for cases that need parameters:
+
+```yaml
+capabilities:
+  - safe-bash
+  - bash:
+      - "git diff*"
+  - delegate:
+      - nested/workers/impl-worker
+```

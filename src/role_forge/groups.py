@@ -1,9 +1,4 @@
-"""Platform-agnostic capability group and bash policy definitions.
-
-Tool groups map abstract capability names to semantic tool identifiers.
-Bash policies map policy names to lists of allowed command patterns.
-Adapters translate these into platform-specific tool names and formats.
-"""
+"""Static capability group and bash policy definitions."""
 
 from __future__ import annotations
 

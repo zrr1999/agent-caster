@@ -1,6 +1,7 @@
 """Tests for OpenCode adapter."""
 
 from role_forge.adapters.opencode import OpenCodeAdapter
+from role_forge.capabilities import CapabilitySpec
 from role_forge.groups import SAFE_BASH_PATTERNS
 from role_forge.models import AgentDef, ModelConfig, TargetConfig
 
@@ -81,9 +82,9 @@ def test_safe_bash_expands_patterns(opencode_config):
         capabilities=["read", "safe-bash"],
     )
     adapter = OpenCodeAdapter()
-    tools, bash_allowed, _ = adapter._expand_capabilities(
-        agent.capabilities, opencode_config.capability_map
-    )
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = spec.tool_flags()
+    bash_allowed = spec.bash_patterns
     assert tools.get("bash") is True
     for p in SAFE_BASH_PATTERNS:
         assert p in bash_allowed
@@ -97,9 +98,9 @@ def test_readonly_bash_is_superset_of_safe(opencode_config):
         capabilities=["readonly-bash"],
     )
     adapter = OpenCodeAdapter()
-    _, bash_allowed, _ = adapter._expand_capabilities(
+    bash_allowed = adapter._expand_capabilities(
         agent.capabilities, opencode_config.capability_map
-    )
+    ).bash_patterns
     for p in SAFE_BASH_PATTERNS:
         assert p in bash_allowed
     assert len(bash_allowed) > len(SAFE_BASH_PATTERNS)
@@ -116,9 +117,9 @@ def test_bash_policy_merges_with_explicit_patterns(opencode_config):
         ],
     )
     adapter = OpenCodeAdapter()
-    _, bash_allowed, _ = adapter._expand_capabilities(
+    bash_allowed = adapter._expand_capabilities(
         agent.capabilities, opencode_config.capability_map
-    )
+    ).bash_patterns
     # Should contain safe-bash patterns
     for p in SAFE_BASH_PATTERNS:
         assert p in bash_allowed
@@ -138,9 +139,9 @@ def test_bash_policy_deduplicates(opencode_config):
         ],
     )
     adapter = OpenCodeAdapter()
-    _, bash_allowed, _ = adapter._expand_capabilities(
+    bash_allowed = adapter._expand_capabilities(
         agent.capabilities, opencode_config.capability_map
-    )
+    ).bash_patterns
     assert bash_allowed.count("echo *") == 1
     assert "custom cmd*" in bash_allowed
 
@@ -153,7 +154,9 @@ def test_read_group_expands_tools(opencode_config):
         capabilities=["read"],
     )
     adapter = OpenCodeAdapter()
-    tools, _, _ = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
     assert tools == {"read": True, "glob": True, "grep": True}
 
 
@@ -165,7 +168,9 @@ def test_write_group_expands_tools(opencode_config):
         capabilities=["write"],
     )
     adapter = OpenCodeAdapter()
-    tools, _, _ = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
     assert tools == {"write": True, "edit": True}
 
 
@@ -176,9 +181,10 @@ def test_all_capability_expands_all_tools(opencode_config):
         capabilities=["all"],
     )
     adapter = OpenCodeAdapter()
-    tools, bash_allowed, delegates = adapter._expand_capabilities(
-        agent.capabilities, opencode_config.capability_map
-    )
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = spec.tool_flags()
+    bash_allowed = spec.bash_patterns
+    delegates = spec.delegates
     assert tools == {
         "read": True,
         "glob": True,
@@ -190,8 +196,24 @@ def test_all_capability_expands_all_tools(opencode_config):
         "bash": True,
         "task": True,
     }
-    assert bash_allowed == []
-    assert delegates == []
+    assert bash_allowed == ()
+    assert delegates == ()
+
+
+def test_expand_capabilities_returns_canonical_spec(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["read", {"bash": ["git diff*"]}, {"delegate": ["worker"]}],
+    )
+    adapter = OpenCodeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    assert spec == CapabilitySpec(
+        tool_ids=("read", "glob", "grep", "bash", "task"),
+        bash_patterns=("git diff*",),
+        delegates=("worker",),
+        full_access=False,
+    )
 
 
 def test_all_capability_grants_full_permissions(opencode_config):

@@ -23,6 +23,8 @@ All adapters now share one render pipeline:
 
 That keeps platform-specific code focused on frontmatter and permissions instead of repeating filesystem and validation logic.
 
+Adapters also consume the same centralized capability expansion step. Built-in capability groups, aliases, bash policies, delegation metadata, and `all` are normalized before target-specific rendering begins.
+
 ## Third-party adapters
 
 Register adapters through the `role_forge.adapters` entry point group.

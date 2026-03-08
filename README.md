@@ -25,6 +25,10 @@ role-forge list
 - validate hierarchy and output layout before rendering
 - support extension through adapter entry points
 
+## Capability model
+
+Canonical roles declare abstract capabilities such as `read`, `write`, `web-read`, `safe-bash`, and `delegate`. `role-forge` expands those once into a shared intermediate capability model, then each adapter renders the matching tools and permissions for its target. See `docs/reference/canonical-role-definition.md` for the full vocabulary, including `all`.
+
 ## Documentation
 
 - live site: `https://role-forge.sixbones.dev`

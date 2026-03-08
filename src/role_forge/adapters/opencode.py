@@ -6,7 +6,7 @@ Migrated from precision-alignment-agent/adapters/opencode/generate.py.
 from __future__ import annotations
 
 from role_forge.adapters.base import BaseAdapter
-from role_forge.groups import ALL_TOOL_IDS, BASH_POLICIES, TOOL_GROUPS
+from role_forge.capabilities import CapabilitySpec, expand_capabilities
 from role_forge.models import AgentDef, TargetConfig
 
 
@@ -20,53 +20,8 @@ class OpenCodeAdapter(BaseAdapter):
         self,
         capabilities: list[str | dict],
         capability_map: dict[str, dict[str, bool]],
-    ) -> tuple[dict[str, bool], list[str], list[str]]:
-        """Expand raw capabilities into OpenCode tools, bash patterns, delegates.
-
-        Bash policy groups (safe-bash, readonly-bash) and explicit ``bash: [...]``
-        entries are **merged** — the final whitelist is the union of all patterns.
-        """
-        tools: dict[str, bool] = {}
-        bash_allowed: list[str] = []
-        delegates: list[str] = []
-
-        for cap in capabilities:
-            if isinstance(cap, str):
-                # Bash policy group
-                if cap in BASH_POLICIES:
-                    bash_allowed.extend(BASH_POLICIES[cap])
-                    tools["bash"] = True
-                elif cap == "all":
-                    tools.update(dict.fromkeys(ALL_TOOL_IDS, True))
-                # Built-in tool group
-                elif cap in TOOL_GROUPS:
-                    for tool_id in TOOL_GROUPS[cap]:
-                        tools[tool_id] = True
-                # User-defined capability_map from refit.toml
-                elif cap in capability_map:
-                    tools.update(capability_map[cap])
-                else:
-                    # Pass through as-is — the platform may support it natively
-                    tools[cap] = True
-            elif isinstance(cap, dict):
-                if "bash" in cap:
-                    bash_allowed.extend(cap["bash"] or [])
-                    tools["bash"] = True
-                if "delegate" in cap:
-                    delegates = cap["delegate"] or []
-                    if delegates:
-                        tools["task"] = True
-
-        # Deduplicate bash patterns while preserving order
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for p in bash_allowed:
-            if p not in seen:
-                seen.add(p)
-                deduped.append(p)
-        bash_allowed = deduped
-
-        return {k: v for k, v in tools.items() if v}, bash_allowed, delegates
+    ) -> CapabilitySpec:
+        return expand_capabilities(capabilities, capability_map)
 
     def _resolve_temperature(self, agent: AgentDef) -> float:
         model = agent.model
@@ -169,9 +124,9 @@ class OpenCodeAdapter(BaseAdapter):
         config: TargetConfig,
         delegates: list[str],
     ) -> str:
-        tools, bash_allowed, _ = self._expand_capabilities(
-            agent.capabilities, config.capability_map
-        )
+        spec = self._expand_capabilities(agent.capabilities, config.capability_map)
+        tools = spec.tool_flags()
+        bash_allowed = list(spec.bash_patterns)
 
         description = agent.description
         mode = agent.role
@@ -183,7 +138,7 @@ class OpenCodeAdapter(BaseAdapter):
             delegates,
             tools,
             agent.role,
-            full_access="all" in agent.capabilities,
+            full_access=spec.full_access,
         )
 
         fm = self._serialize_frontmatter(
