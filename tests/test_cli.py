@@ -18,6 +18,7 @@ def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "role-forge" in result.output
+    assert "0.0.1" in result.output
 
 
 def test_legacy_cli_shows_rename_hint():

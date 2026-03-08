@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-from role_forge._version import __version__, __version_tuple__
+__version__ = "0.0.1"
+__version_tuple__ = (0, 0, 1)
 
 __all__ = ["__version__", "__version_tuple__"]
-
-__path__ = [str(Path(__file__).resolve().parent)]
-sys.modules.setdefault("agent_caster", sys.modules[__name__])

@@ -1,9 +1,10 @@
 [build-system]
-requires = ["hatch-vcs", "hatchling"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
 name = "role-forge"
+version = "0.0.1"
 description = "Canonical role-definition toolkit for coding agents"
 requires-python = ">=3.12"
 license = "MIT"
@@ -13,7 +14,6 @@ dependencies = [
   "pyyaml>=6.0",
   "typer>=0.15.0",
 ]
-dynamic = ["version"]
 
 [project.scripts]
 agent-caster = "role_forge.legacy_cli:main"
@@ -97,12 +97,6 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
-
-[tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.build.hooks.vcs]
-version-file = "src/role_forge/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/role_forge"]

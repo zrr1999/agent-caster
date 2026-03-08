@@ -372,6 +372,7 @@ wheels = [
 
 [[package]]
 name = "role-forge"
+version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "loguru" },

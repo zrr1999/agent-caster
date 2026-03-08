@@ -28,7 +28,7 @@ jobs:
         run: uv sync --group test
 
       - name: Run tests
-        run: uv run pytest --cov=agent_caster --cov-report=term-missing --cov-report=xml
+        run: uv run pytest --cov=role_forge --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage
         if: matrix.python-version == '3.13'
