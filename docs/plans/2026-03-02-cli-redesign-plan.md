@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Refactor agent-caster from a compiler-only CLI to a package manager + compiler, with `add` as the core command that fetches agent definitions from GitHub and auto-casts to detected platforms.
+**Goal:** Refactor agent-caster from a render-only CLI to a package manager + renderer, with `add` as the core command that fetches agent definitions from GitHub and auto-casts to detected platforms.
 
 **Architecture:** New `registry.py` handles source parsing and git operations. New `platform.py` detects installed AI tools. `cli.py` is rewritten with `add/update/list/remove/cast` commands. Existing `loader.py`, `adapters/`, `groups.py` stay largely unchanged. `config.py` simplified to only read source repo configs.
 
@@ -313,51 +313,51 @@ git commit -m "✨ feat(registry): add git clone/fetch and cache management"
 Append to `tests/test_registry.py`:
 
 ```python
-from agent_caster.registry import find_agents_dir
+from agent_caster.registry import find_roles_dir
 
 
-def test_find_agents_dir_with_refit_toml(tmp_path):
-    """refit.toml agents_dir takes priority."""
-    (tmp_path / "refit.toml").write_text('[project]\nagents_dir = "my-agents"')
+def test_find_roles_dir_with_refit_toml(tmp_path):
+    """refit.toml roles_dir takes priority."""
+    (tmp_path / "refit.toml").write_text('[project]\nroles_dir = "my-agents"')
     agents = tmp_path / "my-agents"
     agents.mkdir()
     (agents / "test.md").write_text("---\nname: test\n---\n")
 
-    result = find_agents_dir(tmp_path)
+    result = find_roles_dir(tmp_path)
     assert result == agents
 
 
-def test_find_agents_dir_default_roles(tmp_path):
+def test_find_roles_dir_default_roles(tmp_path):
     """Without refit.toml, falls back to roles/."""
     roles = tmp_path / "roles"
     roles.mkdir()
     (roles / "test.md").write_text("---\nname: test\n---\n")
 
-    result = find_agents_dir(tmp_path)
+    result = find_roles_dir(tmp_path)
     assert result == roles
 
 
-def test_find_agents_dir_refit_without_agents_dir(tmp_path):
-    """refit.toml without agents_dir falls back to roles/."""
+def test_find_roles_dir_refit_without_roles_dir(tmp_path):
+    """refit.toml without roles_dir falls back to roles/."""
     (tmp_path / "refit.toml").write_text("[project]\n")
     roles = tmp_path / "roles"
     roles.mkdir()
     (roles / "test.md").write_text("---\nname: test\n---\n")
 
-    result = find_agents_dir(tmp_path)
+    result = find_roles_dir(tmp_path)
     assert result == roles
 
 
-def test_find_agents_dir_none_found(tmp_path):
+def test_find_roles_dir_none_found(tmp_path):
     """No refit.toml and no roles/ should raise."""
     with pytest.raises(FileNotFoundError, match="No agent definitions found"):
-        find_agents_dir(tmp_path)
+        find_roles_dir(tmp_path)
 ```
 
 **Step 2: Run tests to verify they fail**
 
-Run: `uv run pytest tests/test_registry.py::test_find_agents_dir_with_refit_toml -v`
-Expected: FAIL — `ImportError: cannot import name 'find_agents_dir'`
+Run: `uv run pytest tests/test_registry.py::test_find_roles_dir_with_refit_toml -v`
+Expected: FAIL — `ImportError: cannot import name 'find_roles_dir'`
 
 **Step 3: Write minimal implementation**
 
@@ -367,22 +367,22 @@ Append to `src/agent_caster/registry.py`:
 import tomllib
 
 
-def find_agents_dir(repo_path: Path) -> Path:
+def find_roles_dir(repo_path: Path) -> Path:
     """Find agent definitions directory in a fetched repo.
 
     Priority:
-    1. refit.toml agents_dir setting
+    1. refit.toml roles_dir setting
     2. roles/ directory
     """
     refit_path = repo_path / "refit.toml"
     if refit_path.is_file():
         with open(refit_path, "rb") as f:
             data = tomllib.load(f)
-        agents_dir_name = data.get("project", {}).get("agents_dir")
-        if agents_dir_name:
-            agents_dir = repo_path / agents_dir_name
-            if agents_dir.is_dir():
-                return agents_dir
+        roles_dir_name = data.get("project", {}).get("roles_dir")
+        if roles_dir_name:
+            roles_dir = repo_path / roles_dir_name
+            if roles_dir.is_dir():
+                return roles_dir
 
     # Default fallback
     roles_dir = repo_path / "roles"
@@ -391,7 +391,7 @@ def find_agents_dir(repo_path: Path) -> Path:
 
     raise FileNotFoundError(
         f"No agent definitions found in {repo_path}. "
-        "Expected refit.toml with agents_dir or a roles/ directory."
+        "Expected refit.toml with roles_dir or a roles/ directory."
     )
 ```
 
@@ -677,7 +677,7 @@ def test_add_with_auto_cast(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     project = tmp_path / "project"
@@ -698,7 +698,7 @@ def test_add_with_explicit_target(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
 
     project = tmp_path / "project"
@@ -716,9 +716,9 @@ def test_add_with_explicit_target(tmp_path):
 
 
 def test_list_agents(tmp_path):
-    agents_dir = tmp_path / ".agents" / "roles"
-    agents_dir.mkdir(parents=True)
-    (agents_dir / "explorer.md").write_text(
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
         "model:\n  tier: reasoning\n---\n# Explorer\n"
     )
@@ -731,11 +731,11 @@ def test_list_agents(tmp_path):
 
 
 def test_cast_with_target(tmp_path):
-    agents_dir = tmp_path / ".agents" / "roles"
-    agents_dir.mkdir(parents=True)
-    (agents_dir / "explorer.md").write_text(
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
     result = runner.invoke(app, [
         "cast", "--target", "claude", "--project-dir", str(tmp_path),
@@ -748,19 +748,19 @@ def test_cast_with_target(tmp_path):
 
 
 def test_remove_agent(tmp_path):
-    agents_dir = tmp_path / ".agents" / "roles"
-    agents_dir.mkdir(parents=True)
-    (agents_dir / "explorer.md").write_text("---\nname: explorer\n---\n# E")
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# E")
     result = runner.invoke(app, [
         "remove", "explorer", "--yes", "--project-dir", str(tmp_path),
     ])
     assert result.exit_code == 0
-    assert not (agents_dir / "explorer.md").exists()
+    assert not (roles_dir / "explorer.md").exists()
 
 
 def test_remove_nonexistent(tmp_path):
-    agents_dir = tmp_path / ".agents" / "roles"
-    agents_dir.mkdir(parents=True)
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
     result = runner.invoke(app, [
         "remove", "nonexistent", "--project-dir", str(tmp_path),
     ])
@@ -829,7 +829,7 @@ def add(
     from agent_caster.loader import load_agents
     from agent_caster.models import TargetConfig
     from agent_caster.platform import detect_platforms
-    from agent_caster.registry import fetch_source, find_agents_dir, parse_source
+    from agent_caster.registry import fetch_source, find_roles_dir, parse_source
 
     parsed = parse_source(source)
 
@@ -840,12 +840,12 @@ def add(
         raise typer.Exit(1) from e
 
     try:
-        agents_dir = find_agents_dir(repo_path)
+        roles_dir = find_roles_dir(repo_path)
     except FileNotFoundError as e:
         logger.error(str(e))
         raise typer.Exit(1) from e
 
-    agents = load_agents(agents_dir)
+    agents = load_agents(roles_dir)
     if not agents:
         logger.error("No agent definitions found in source.")
         raise typer.Exit(1)
@@ -924,13 +924,13 @@ def list_agents(
     from agent_caster.loader import load_agents
 
     project = Path(project_dir).resolve() if project_dir else Path.cwd()
-    agents_dir = project / ".agents" / "roles"
+    roles_dir = project / ".agents" / "roles"
 
-    if not agents_dir.is_dir():
+    if not roles_dir.is_dir():
         logger.error("No agents found. Run 'agent-caster add' first.")
         raise typer.Exit(1)
 
-    agents = load_agents(agents_dir)
+    agents = load_agents(roles_dir)
 
     logger.info(f"{'AGENT':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
     logger.info("-" * 55)
@@ -957,13 +957,13 @@ def cast(
     from agent_caster.platform import detect_platforms
 
     project = Path(project_dir).resolve() if project_dir else Path.cwd()
-    agents_dir = project / ".agents" / "roles"
+    roles_dir = project / ".agents" / "roles"
 
-    if not agents_dir.is_dir():
+    if not roles_dir.is_dir():
         logger.error("No agents found. Run 'agent-caster add' first.")
         raise typer.Exit(1)
 
-    agents = load_agents(agents_dir)
+    agents = load_agents(roles_dir)
     cast_targets = list(target) if target else detect_platforms(project)
 
     if not cast_targets:
@@ -1003,8 +1003,8 @@ def remove(
 ) -> None:
     """Remove an installed agent definition."""
     project = Path(project_dir).resolve() if project_dir else Path.cwd()
-    agents_dir = project / ".agents" / "roles"
-    agent_file = agents_dir / f"{agent_name}.md"
+    roles_dir = project / ".agents" / "roles"
+    agent_file = roles_dir / f"{agent_name}.md"
 
     if not agent_file.is_file():
         logger.error(f"Agent not found: {agent_name}")
@@ -1101,7 +1101,7 @@ git commit -m "📝 docs: update project description and README for new CLI"
 
 **Step 1: Simplify config.py**
 
-Remove `find_config` function. `load_config` stays as-is — it's used by `registry.py:find_agents_dir` to read source repo configs.
+Remove `find_config` function. `load_config` stays as-is — it's used by `registry.py:find_roles_dir` to read source repo configs.
 
 **Step 2: Simplify caster.py**
 
@@ -1109,7 +1109,7 @@ The `cast_agents` and `write_outputs` functions can be simplified or removed —
 
 **Step 3: Update tests**
 
-Remove `test_find_config_from_subdir` and `test_find_config_not_found` from `tests/test_config.py`. Keep `load_config` tests since `find_agents_dir` in registry uses it.
+Remove `test_find_config_from_subdir` and `test_find_config_not_found` from `tests/test_config.py`. Keep `load_config` tests since `find_roles_dir` in registry uses it.
 
 **Step 4: Run full test suite**
 
@@ -1149,11 +1149,11 @@ def test_full_workflow_add_list_cast_remove(tmp_path):
     roles.mkdir(parents=True)
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read-code\n---\n# Explorer\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
     )
     (roles / "aligner.md").write_text(
         "---\nname: aligner\ndescription: Aligner\nrole: subagent\n"
-        "model:\n  tier: coding\ncapabilities:\n  - write-code\n---\n# Aligner\n"
+        "model:\n  tier: coding\ncapabilities:\n  - write\n---\n# Aligner\n"
     )
 
     project = tmp_path / "project"

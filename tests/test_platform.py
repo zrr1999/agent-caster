@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_caster.platform import detect_platforms
+from role_forge.platform import detect_platforms
 
 
 def test_detect_claude_by_dir(tmp_path):

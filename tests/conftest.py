@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_caster.models import AgentDef, ModelConfig, TargetConfig
+from role_forge.models import AgentDef, ModelConfig, TargetConfig
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -25,9 +25,9 @@ def sample_explorer() -> AgentDef:
         model=ModelConfig(tier="reasoning", temperature=0.05),
         skills=["repomix-explorer"],
         capabilities=[
-            "read-code",
-            "write-report",
-            "web-read",
+            "read",
+            "write",
+            "web-access",
             "context7",
             {"bash": ["npx repomix@latest*", "bunx repomix@latest*"]},
         ],
@@ -43,7 +43,7 @@ def sample_aligner() -> AgentDef:
         role="subagent",
         model=ModelConfig(tier="coding", temperature=0.1),
         skills=[],
-        capabilities=["read-code", "write-code"],
+        capabilities=["read", "write"],
         prompt_content="# Aligner",
     )
 
@@ -57,8 +57,8 @@ def sample_orchestrator() -> AgentDef:
         model=ModelConfig(tier="reasoning", temperature=0.2),
         skills=[],
         capabilities=[
-            "read-code",
-            "write-report",
+            "read",
+            "write",
             {"bash": ["ls*", "cat*", "git status*"]},
             {"delegate": ["explorer", "aligner"]},
         ],

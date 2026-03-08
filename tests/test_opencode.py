@@ -1,8 +1,9 @@
 """Tests for OpenCode adapter."""
 
-from agent_caster.adapters.opencode import OpenCodeAdapter
-from agent_caster.groups import SAFE_BASH_PATTERNS
-from agent_caster.models import AgentDef, ModelConfig, TargetConfig
+from role_forge.adapters.opencode import OpenCodeAdapter
+from role_forge.capabilities import CapabilitySpec
+from role_forge.groups import SAFE_BASH_PATTERNS
+from role_forge.models import AgentDef, ModelConfig, TargetConfig
 
 
 def test_cast_explorer(sample_explorer, opencode_config, snapshot):
@@ -60,12 +61,12 @@ def test_temperature_default_subagent(opencode_config, snapshot):
 
 def test_cast_all_fixtures(fixtures_dir, opencode_config, snapshot):
     """Cast all fixture agents and verify output count and content."""
-    from agent_caster.loader import load_agents
+    from role_forge.loader import load_agents
 
     agents = load_agents(fixtures_dir / ".agents" / "roles")
     adapter = OpenCodeAdapter()
     outputs = adapter.cast(agents, opencode_config)
-    assert len(outputs) == 3
+    assert len(outputs) == 8
     contents = {o.path.split("/")[-1]: o.content for o in outputs}
     assert contents == snapshot
 
@@ -81,28 +82,29 @@ def test_safe_bash_expands_patterns(opencode_config):
         capabilities=["read", "safe-bash"],
     )
     adapter = OpenCodeAdapter()
-    tools, bash_allowed, _ = adapter._expand_capabilities(
-        agent.capabilities, opencode_config.capability_map
-    )
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = spec.tool_flags()
+    bash_allowed = spec.bash_patterns
     assert tools.get("bash") is True
     for p in SAFE_BASH_PATTERNS:
         assert p in bash_allowed
 
 
-def test_readonly_bash_is_superset_of_safe(opencode_config):
-    """readonly-bash should contain all patterns from safe-bash plus extras."""
+def test_bash_capability_grants_unrestricted_bash(opencode_config):
     agent = AgentDef(
         name="test",
         description="Test",
-        capabilities=["readonly-bash"],
+        capabilities=["bash"],
     )
     adapter = OpenCodeAdapter()
-    _, bash_allowed, _ = adapter._expand_capabilities(
-        agent.capabilities, opencode_config.capability_map
-    )
-    for p in SAFE_BASH_PATTERNS:
-        assert p in bash_allowed
-    assert len(bash_allowed) > len(SAFE_BASH_PATTERNS)
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    assert spec.tool_flags() == {"bash": True}
+    assert spec.bash_patterns == ()
+
+    outputs = adapter.cast([agent], opencode_config)
+    content = outputs[0].content
+    assert '"bash": true' in content
+    assert '"bash": allow' in content
 
 
 def test_bash_policy_merges_with_explicit_patterns(opencode_config):
@@ -116,9 +118,9 @@ def test_bash_policy_merges_with_explicit_patterns(opencode_config):
         ],
     )
     adapter = OpenCodeAdapter()
-    _, bash_allowed, _ = adapter._expand_capabilities(
+    bash_allowed = adapter._expand_capabilities(
         agent.capabilities, opencode_config.capability_map
-    )
+    ).bash_patterns
     # Should contain safe-bash patterns
     for p in SAFE_BASH_PATTERNS:
         assert p in bash_allowed
@@ -138,9 +140,9 @@ def test_bash_policy_deduplicates(opencode_config):
         ],
     )
     adapter = OpenCodeAdapter()
-    _, bash_allowed, _ = adapter._expand_capabilities(
+    bash_allowed = adapter._expand_capabilities(
         agent.capabilities, opencode_config.capability_map
-    )
+    ).bash_patterns
     assert bash_allowed.count("echo *") == 1
     assert "custom cmd*" in bash_allowed
 
@@ -153,7 +155,9 @@ def test_read_group_expands_tools(opencode_config):
         capabilities=["read"],
     )
     adapter = OpenCodeAdapter()
-    tools, _, _ = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
     assert tools == {"read": True, "glob": True, "grep": True}
 
 
@@ -165,8 +169,144 @@ def test_write_group_expands_tools(opencode_config):
         capabilities=["write"],
     )
     adapter = OpenCodeAdapter()
-    tools, _, _ = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
     assert tools == {"write": True, "edit": True}
+
+
+def test_basic_group_expands_tools(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["basic"],
+    )
+    adapter = OpenCodeAdapter()
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
+    assert tools == {
+        "read": True,
+        "glob": True,
+        "grep": True,
+        "write": True,
+        "edit": True,
+        "webfetch": True,
+        "websearch": True,
+    }
+
+
+def test_empty_capabilities_default_to_basic(opencode_config):
+    agent = AgentDef(name="test", description="Test", capabilities=[])
+    adapter = OpenCodeAdapter()
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
+    assert tools == {
+        "read": True,
+        "glob": True,
+        "grep": True,
+        "write": True,
+        "edit": True,
+        "webfetch": True,
+        "websearch": True,
+    }
+
+
+def test_delegate_group_enables_task(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["delegate"],
+    )
+    adapter = OpenCodeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    assert spec.tool_flags() == {"task": True}
+    assert spec.delegates == ()
+
+
+def test_web_access_group_expands_tools(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["web-access"],
+    )
+    adapter = OpenCodeAdapter()
+    tools = adapter._expand_capabilities(
+        agent.capabilities, opencode_config.capability_map
+    ).tool_flags()
+    assert tools == {"webfetch": True, "websearch": True}
+
+
+def test_all_capability_expands_all_tools(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["all"],
+    )
+    adapter = OpenCodeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    tools = spec.tool_flags()
+    bash_allowed = spec.bash_patterns
+    delegates = spec.delegates
+    assert tools == {
+        "read": True,
+        "glob": True,
+        "grep": True,
+        "write": True,
+        "edit": True,
+        "webfetch": True,
+        "websearch": True,
+        "bash": True,
+        "task": True,
+    }
+    assert bash_allowed == ()
+    assert delegates == ()
+
+
+def test_expand_capabilities_returns_canonical_spec(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["read", {"bash": ["git diff*"]}, {"delegate": ["worker"]}],
+    )
+    adapter = OpenCodeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, opencode_config.capability_map)
+    assert spec == CapabilitySpec(
+        tool_ids=("read", "glob", "grep", "bash", "task"),
+        bash_patterns=("git diff*",),
+        delegates=("worker",),
+        full_access=False,
+    )
+
+
+def test_all_capability_grants_full_permissions(opencode_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["all"],
+    )
+    adapter = OpenCodeAdapter()
+    outputs = adapter.cast([agent], opencode_config)
+    content = outputs[0].content
+    assert '"read": true' in content
+    assert '"glob": true' in content
+    assert '"grep": true' in content
+    assert '"write": true' in content
+    assert '"edit": true' in content
+    assert '"webfetch": true' in content
+    assert '"websearch": true' in content
+    assert '"bash": true' in content
+    assert '"task": true' in content
+    assert '"bash": allow' in content
+    assert '"task": allow' in content
+    assert '"read": allow' in content
+    assert '"glob": allow' in content
+    assert '"grep": allow' in content
+    assert '"write": allow' in content
+    assert '"edit": allow' in content
+    assert '"webfetch": allow' in content
+    assert '"websearch": allow' in content
 
 
 def test_custom_tier_falls_back_to_reasoning(opencode_config):

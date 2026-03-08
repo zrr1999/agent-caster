@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "uv sync --dev",
+  "buildCommand": "uv run zensical build",
+  "outputDirectory": "site"
+}

@@ -1,8 +1,9 @@
 """Tests for Claude Code adapter."""
 
-from agent_caster.adapters.claude import ClaudeAdapter
-from agent_caster.groups import SAFE_BASH_PATTERNS
-from agent_caster.models import AgentDef, TargetConfig
+from role_forge.adapters.claude import ClaudeAdapter
+from role_forge.capabilities import CapabilitySpec
+from role_forge.groups import SAFE_BASH_PATTERNS
+from role_forge.models import AgentDef, TargetConfig
 
 
 def test_cast_aligner(sample_aligner, claude_config, snapshot):
@@ -51,21 +52,19 @@ def test_safe_bash_expands_to_bash_patterns(claude_config):
     assert "Bash(git log*)" in content
 
 
-def test_readonly_bash_superset(claude_config):
-    """readonly-bash should include safe-bash patterns plus read-only extras."""
+def test_bash_capability_renders_unrestricted_bash(claude_config):
     agent = AgentDef(
         name="test",
         description="Test",
-        capabilities=["readonly-bash"],
+        capabilities=["bash"],
     )
     adapter = ClaudeAdapter()
-    _, bash_patterns, _ = adapter._expand_capabilities(
-        agent.capabilities, claude_config.capability_map
-    )
-    for p in SAFE_BASH_PATTERNS:
-        assert p in bash_patterns
-    assert "cat*" in bash_patterns
-    assert "find*" in bash_patterns
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    assert spec.tool_ids == ("bash",)
+    assert spec.bash_patterns == ()
+
+    outputs = adapter.cast([agent], claude_config)
+    assert "tools: Bash" in outputs[0].content
 
 
 def test_bash_policy_merge_with_explicit(claude_config):
@@ -79,9 +78,9 @@ def test_bash_policy_merge_with_explicit(claude_config):
         ],
     )
     adapter = ClaudeAdapter()
-    _, bash_patterns, _ = adapter._expand_capabilities(
+    bash_patterns = adapter._expand_capabilities(
         agent.capabilities, claude_config.capability_map
-    )
+    ).bash_patterns
     for p in SAFE_BASH_PATTERNS:
         assert p in bash_patterns
     assert "npm test*" in bash_patterns
@@ -96,8 +95,108 @@ def test_read_group_maps_to_claude_tools(claude_config):
         capabilities=["read"],
     )
     adapter = ClaudeAdapter()
-    tools, _, _ = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    tools = adapter._map_tool_ids(spec)
     assert set(tools) == {"Glob", "Grep", "Read"}
+
+
+def test_basic_group_maps_to_claude_tools(claude_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["basic"],
+    )
+    adapter = ClaudeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    tools = adapter._map_tool_ids(spec)
+    assert set(tools) == {"Edit", "Glob", "Grep", "Read", "WebFetch", "WebSearch", "Write"}
+
+
+def test_empty_capabilities_default_to_basic(claude_config):
+    agent = AgentDef(name="test", description="Test", capabilities=[])
+    adapter = ClaudeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    tools = adapter._map_tool_ids(spec)
+    assert set(tools) == {"Edit", "Glob", "Grep", "Read", "WebFetch", "WebSearch", "Write"}
+
+
+def test_delegate_group_maps_to_task_tool(claude_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["delegate"],
+    )
+    adapter = ClaudeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    tools = adapter._map_tool_ids(spec)
+    assert set(tools) == {"Task"}
+    assert spec.delegates == ()
+
+
+def test_web_access_group_maps_to_claude_tools(claude_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["web-access"],
+    )
+    adapter = ClaudeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    tools = adapter._map_tool_ids(spec)
+    assert set(tools) == {"WebFetch", "WebSearch"}
+
+
+def test_all_capability_maps_to_all_claude_tools(claude_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["all"],
+    )
+    adapter = ClaudeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    tools = adapter._map_tool_ids(spec)
+    bash_patterns = spec.bash_patterns
+    delegates = spec.delegates
+    assert set(tools) == {
+        "Bash",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Task",
+        "WebFetch",
+        "WebSearch",
+        "Write",
+    }
+    assert bash_patterns == ()
+    assert delegates == ()
+
+
+def test_expand_capabilities_returns_canonical_spec(claude_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["read", {"bash": ["git diff*"]}, {"delegate": ["worker"]}],
+    )
+    adapter = ClaudeAdapter()
+    spec = adapter._expand_capabilities(agent.capabilities, claude_config.capability_map)
+    assert spec == CapabilitySpec(
+        tool_ids=("read", "glob", "grep", "bash", "task"),
+        bash_patterns=("git diff*",),
+        delegates=("worker",),
+        full_access=False,
+    )
+
+
+def test_all_capability_renders_unrestricted_bash_and_task(claude_config):
+    agent = AgentDef(
+        name="test",
+        description="Test",
+        capabilities=["all"],
+    )
+    adapter = ClaudeAdapter()
+    outputs = adapter.cast([agent], claude_config)
+    content = outputs[0].content
+    assert "tools: Bash, Edit, Glob, Grep, Read, Task, WebFetch, WebSearch, Write" in content
 
 
 def test_default_model_map():

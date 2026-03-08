@@ -7,10 +7,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent_caster.registry import (
+from role_forge.registry import (
     CACHE_DIR,  # noqa: F401
     fetch_source,
-    find_agents_dir,
+    find_roles_dir,
     parse_source,
 )
 
@@ -80,7 +80,7 @@ def test_fetch_local_source_not_found():
         fetch_source(src)
 
 
-@patch("agent_caster.registry.subprocess.run")
+@patch("role_forge.registry.subprocess.run")
 def test_fetch_github_clones_to_cache(mock_run, tmp_path):
     """First fetch should git clone to cache dir."""
     mock_run.return_value = MagicMock(returncode=0)
@@ -95,7 +95,7 @@ def test_fetch_github_clones_to_cache(mock_run, tmp_path):
     assert "clone" in clone_call.args[0]
 
 
-@patch("agent_caster.registry.subprocess.run")
+@patch("role_forge.registry.subprocess.run")
 def test_fetch_github_pulls_existing_cache(mock_run, tmp_path):
     """If cache exists, should git fetch + checkout instead of clone."""
     mock_run.return_value = MagicMock(returncode=0)
@@ -112,67 +112,42 @@ def test_fetch_github_pulls_existing_cache(mock_run, tmp_path):
     assert "fetch" in calls_str
 
 
-# --- find_agents_dir tests ---
+# --- find_roles_dir tests ---
 
 
-def test_find_agents_dir_with_roles_toml(tmp_path):
-    """roles.toml agents_dir is honoured (canonical name)."""
-    (tmp_path / "roles.toml").write_text('[project]\nagents_dir = "my-agents"')
+def test_find_roles_dir_with_roles_toml(tmp_path):
+    """roles.toml roles_dir is honoured (canonical name)."""
+    (tmp_path / "roles.toml").write_text('[project]\nroles_dir = "my-agents"')
     agents = tmp_path / "my-agents"
     agents.mkdir()
     (agents / "test.md").write_text("---\nname: test\n---\n")
 
-    result = find_agents_dir(tmp_path)
+    result = find_roles_dir(tmp_path)
     assert result == agents
 
 
-def test_find_agents_dir_with_refit_toml(tmp_path):
-    """Legacy refit.toml agents_dir still works for backward compatibility."""
-    (tmp_path / "refit.toml").write_text('[project]\nagents_dir = "my-agents"')
+def test_find_roles_dir_with_legacy_roles_dir_key(tmp_path):
+    """roles.toml roles_dir remains supported for backward compatibility."""
+    (tmp_path / "roles.toml").write_text('[project]\nroles_dir = "my-agents"')
     agents = tmp_path / "my-agents"
     agents.mkdir()
     (agents / "test.md").write_text("---\nname: test\n---\n")
 
-    result = find_agents_dir(tmp_path)
+    result = find_roles_dir(tmp_path)
     assert result == agents
 
 
-def test_find_agents_dir_roles_toml_takes_priority_over_refit(tmp_path):
-    """roles.toml beats refit.toml when both are present."""
-    (tmp_path / "roles.toml").write_text('[project]\nagents_dir = "canonical-agents"')
-    (tmp_path / "refit.toml").write_text('[project]\nagents_dir = "legacy-agents"')
-    canonical_agents = tmp_path / "canonical-agents"
-    canonical_agents.mkdir()
-    (canonical_agents / "test.md").write_text("---\nname: test\n---\n")
-    legacy_agents = tmp_path / "legacy-agents"
-    legacy_agents.mkdir()
-
-    result = find_agents_dir(tmp_path)
-    assert result == canonical_agents
-
-
-def test_find_agents_dir_default_roles(tmp_path):
+def test_find_roles_dir_default_roles(tmp_path):
     """Without any config file, falls back to roles/."""
     roles = tmp_path / "roles"
     roles.mkdir()
     (roles / "test.md").write_text("---\nname: test\n---\n")
 
-    result = find_agents_dir(tmp_path)
+    result = find_roles_dir(tmp_path)
     assert result == roles
 
 
-def test_find_agents_dir_refit_without_agents_dir(tmp_path):
-    """refit.toml without agents_dir falls back to roles/."""
-    (tmp_path / "refit.toml").write_text("[project]\n")
-    roles = tmp_path / "roles"
-    roles.mkdir()
-    (roles / "test.md").write_text("---\nname: test\n---\n")
-
-    result = find_agents_dir(tmp_path)
-    assert result == roles
-
-
-def test_find_agents_dir_none_found(tmp_path):
+def test_find_roles_dir_none_found(tmp_path):
     """No config file and no roles/ should raise."""
     with pytest.raises(FileNotFoundError, match="No agent definitions found"):
-        find_agents_dir(tmp_path)
+        find_roles_dir(tmp_path)

@@ -11,9 +11,9 @@ skills:
   - repomix-explorer
 
 capabilities:
-  - read-code
-  - write-report
-  - web-read
+  - read
+  - write
+  - web-access
   - context7
   - bash:
       - "npx repomix@latest*"

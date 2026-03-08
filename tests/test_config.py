@@ -1,11 +1,17 @@
 """Tests for config.py."""
 
-from agent_caster.config import CONFIG_FILENAME, LEGACY_CONFIG_FILENAME, find_config, load_config
+from role_forge.config import (
+    CONFIG_FILENAME,
+    find_config,
+    load_config,
+    resolve_roles_dir,
+)
 
 
 def test_load_config_from_fixtures(fixtures_dir):
     config = load_config(fixtures_dir / "roles.toml")
-    assert config.agents_dir == ".agents/roles"
+    assert config.roles_dir == ".agents/roles"
+    assert config.roles_dir == ".agents/roles"
     assert "opencode" in config.targets
     assert "claude" in config.targets
 
@@ -46,25 +52,6 @@ def test_find_config_returns_roles_toml(tmp_path):
     assert result == cfg
 
 
-def test_find_config_falls_back_to_legacy(tmp_path, capsys):
-    """find_config returns refit.toml when roles.toml absent."""
-    legacy = tmp_path / LEGACY_CONFIG_FILENAME
-    legacy.write_text("[project]\n")
-
-    result = find_config(tmp_path)
-    assert result == legacy
-
-
-def test_find_config_prefers_canonical_over_legacy(tmp_path):
-    """roles.toml takes priority even when refit.toml also exists."""
-    canonical = tmp_path / CONFIG_FILENAME
-    canonical.write_text("[project]\nagents_dir = 'canonical'\n")
-    (tmp_path / LEGACY_CONFIG_FILENAME).write_text("[project]\nagents_dir = 'legacy'\n")
-
-    result = find_config(tmp_path)
-    assert result == canonical
-
-
 def test_find_config_returns_none_when_absent(tmp_path):
     """find_config returns None if neither config file exists."""
     assert find_config(tmp_path) is None
@@ -82,3 +69,31 @@ def test_target_output_layout_parsed(tmp_path):
 
     config = load_config(config_path)
     assert config.targets["claude"].output_layout == "namespace"
+
+
+def test_roles_dir_preferred_over_agents_dir(tmp_path):
+    config_path = tmp_path / CONFIG_FILENAME
+    config_path.write_text('[project]\nroles_dir = "roles"\nagents_dir = ".agents/roles"\n')
+
+    config = load_config(config_path)
+    assert config.roles_dir == "roles"
+
+
+def test_agents_dir_supported_as_legacy_alias(tmp_path):
+    config_path = tmp_path / CONFIG_FILENAME
+    config_path.write_text('[project]\nagents_dir = "roles"\n')
+
+    config = load_config(config_path)
+    assert config.roles_dir == "roles"
+    assert config.agents_dir == "roles"
+
+
+def test_resolve_roles_dir_defaults_when_config_absent(tmp_path):
+    assert resolve_roles_dir(tmp_path) == tmp_path / ".agents" / "roles"
+
+
+def test_resolve_roles_dir_uses_roles_toml(tmp_path):
+    config_path = tmp_path / CONFIG_FILENAME
+    config_path.write_text('[project]\nroles_dir = "roles"\n')
+
+    assert resolve_roles_dir(tmp_path) == tmp_path / "roles"

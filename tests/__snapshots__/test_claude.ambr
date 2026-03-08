@@ -15,7 +15,7 @@
   ---
   name: explorer
   description: Code Explorer. Reads and analyzes source code.
-  tools: Bash(bunx repomix@latest*), Bash(npx repomix@latest*), Glob, Grep, Read, WebFetch, Write, context7
+  tools: Bash(bunx repomix@latest*), Bash(npx repomix@latest*), Edit, Glob, Grep, Read, WebFetch, WebSearch, Write, context7
   model: opus
   ---
   # Explorer
@@ -28,7 +28,7 @@
   ---
   name: orchestrator
   description: Orchestrator. Coordinates sub-agents.
-  tools: Bash(cat*), Bash(git status*), Bash(ls*), Glob, Grep, Read, Task(aligner), Task(explorer), Write
+  tools: Bash(cat*), Bash(git status*), Bash(ls*), Edit, Glob, Grep, Read, Task(aligner), Task(explorer), Write
   model: opus
   ---
   # Orchestrator

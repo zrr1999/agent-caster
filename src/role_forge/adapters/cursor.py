@@ -25,28 +25,15 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from agent_caster.models import AgentDef, BaseAdapter, OutputFile, TargetConfig
-from agent_caster.topology import build_output_path, validate_agents, validate_output_layout
+from role_forge.adapters.base import BaseAdapter
+from role_forge.models import AgentDef, TargetConfig
 
 
 class CursorAdapter(BaseAdapter):
     name: ClassVar[str] = "cursor"
+    base_dir = ".cursor/agents"
+    file_suffix = ".mdc"
     # Cursor doesn't support per-agent model selection; default_model_map stays empty
-
-    def cast(
-        self,
-        agents: list[AgentDef],
-        config: TargetConfig,
-    ) -> list[OutputFile]:
-        validate_agents(agents)
-        validate_output_layout(agents, config)
-
-        outputs = []
-        for agent in agents:
-            content = self._generate_agent_mdc(agent)
-            path = build_output_path(agent, base_dir=".cursor/agents", suffix=".mdc", config=config)
-            outputs.append(OutputFile(path=path, content=content))
-        return outputs
 
     def _serialize_frontmatter(self, name: str, description: str) -> str:
         """Emit minimal Cursor MDC frontmatter."""
@@ -57,7 +44,12 @@ class CursorAdapter(BaseAdapter):
         lines.append("---")
         return "\n".join(lines)
 
-    def _generate_agent_mdc(self, agent: AgentDef) -> str:
+    def render_agent(
+        self,
+        agent: AgentDef,
+        config: TargetConfig,
+        delegates: list[str],
+    ) -> str:
+        del config, delegates
         fm = self._serialize_frontmatter(agent.name, agent.description)
-        prompt = agent.prompt_content
-        return f"{fm}\n{prompt}" if prompt else fm
+        return self._compose_document(fm, agent.prompt_content)

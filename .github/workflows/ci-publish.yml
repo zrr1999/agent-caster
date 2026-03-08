@@ -1,21 +1,20 @@
-name: Publish to PyPI
+name: "CI - Publish"
 
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
+  contents: read
   id-token: write
 
 jobs:
   build:
-    name: Build distribution
+    name: Build Distribution
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -25,25 +24,25 @@ jobs:
       - name: Build package
         run: uv build
 
-      - name: Upload dist
+      - name: Upload distribution
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
   publish:
-    name: Publish to PyPI
+    name: Publish To PyPI
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/agent-caster
+      url: https://pypi.org/p/role-forge
     steps:
-      - name: Download dist
+      - name: Download distribution
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
 
-      - name: Publish to PyPI
+      - name: Publish package
         uses: pypa/gh-action-pypi-publish@release/v1

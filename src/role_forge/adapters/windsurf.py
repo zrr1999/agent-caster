@@ -34,29 +34,16 @@ Notes:
 
 from __future__ import annotations
 
-from agent_caster.models import AgentDef, BaseAdapter, OutputFile, TargetConfig
-from agent_caster.topology import build_output_path, validate_agents, validate_output_layout
+from role_forge.adapters.base import BaseAdapter
+from role_forge.models import AgentDef, TargetConfig
 
 TRIGGER = "model_decision"
 
 
 class WindsurfAdapter(BaseAdapter):
     name = "windsurf"
-
-    def cast(
-        self,
-        agents: list[AgentDef],
-        config: TargetConfig,
-    ) -> list[OutputFile]:
-        validate_agents(agents)
-        validate_output_layout(agents, config)
-
-        outputs = []
-        for agent in agents:
-            content = self._generate_rule(agent)
-            path = build_output_path(agent, base_dir=".windsurf/rules", suffix=".md", config=config)
-            outputs.append(OutputFile(path=path, content=content))
-        return outputs
+    base_dir = ".windsurf/rules"
+    file_suffix = ".md"
 
     def _serialize_frontmatter(self, description: str) -> str:
         """Emit Windsurf rule frontmatter."""
@@ -66,7 +53,12 @@ class WindsurfAdapter(BaseAdapter):
         lines.append("---")
         return "\n".join(lines)
 
-    def _generate_rule(self, agent: AgentDef) -> str:
+    def render_agent(
+        self,
+        agent: AgentDef,
+        config: TargetConfig,
+        delegates: list[str],
+    ) -> str:
+        del config, delegates
         fm = self._serialize_frontmatter(agent.description)
-        prompt = agent.prompt_content
-        return f"{fm}\n{prompt}" if prompt else fm
+        return self._compose_document(fm, agent.prompt_content)

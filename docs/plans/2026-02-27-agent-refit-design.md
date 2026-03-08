@@ -1,4 +1,4 @@
-# agent-caster: AI Coding Agent 跨平台定义编译器
+# agent-caster: AI Coding Agent 跨平台定义分发与渲染工具
 
 > Write once, deploy everywhere.
 
@@ -27,17 +27,17 @@ AI coding agent 平台快速增长（Claude Code、Cursor、OpenCode、Codex、W
 
 ### 1.3 定位
 
-**agent-caster** 是一个 AI coding agent 定义的 **跨平台编译器 + 包管理器**：
+**agent-caster** 是一个 AI coding agent 定义的 **跨平台分发与渲染工具 + 包管理器**：
 
-- **编译器维度**：将抽象的 canonical agent 定义编译为各平台的具体配置格式
+- **渲染维度**：将抽象的 canonical agent 定义生成到各平台的具体配置格式
 - **包管理维度**：从 GitHub 仓库安装/更新可复用的 agent 定义
 
 类比：
 
 | 领域 | 类比工具 | agent-caster |
 |------|----------|-------------|
-| 容器 | Dockerfile → docker build | `.agents/roles/*.md` → `agent-caster compile` |
-| 前端 | TypeScript → tsc → JavaScript | Canonical agent def → adapter → Platform config |
+| 容器 | Dockerfile → docker build | `.agents/roles/*.md` → `agent-caster render` |
+| 前端 | Design token → static site build | Canonical agent def → adapter → Platform config |
 | 包管理 | `bunx skills add` | `agent-caster add github:org/repo` |
 
 ---
@@ -49,9 +49,9 @@ AI coding agent 平台快速增长（Claude Code、Cursor、OpenCode、Codex、W
 | 术语 | 含义 |
 |------|------|
 | **Canonical definition** | 平台无关的 agent 定义文件（`.agents/roles/*.md`），是唯一的真实来源 |
-| **Adapter** | 编译器后端，将 canonical 定义转换为特定平台的配置格式 |
-| **Target** | 编译目标平台（opencode、cursor、claude 等） |
-| **Capability group** | 抽象能力组（如 `read-code`），由 adapter 展开为平台特定的工具标志 |
+| **Adapter** | 渲染后端，将 canonical 定义转换为特定平台的配置格式 |
+| **Target** | 输出目标平台（opencode、cursor、claude 等） |
+| **Capability group** | 抽象能力组（如 `read`），由 adapter 展开为平台特定的工具标志 |
 | **Model tier** | 抽象模型层级（`reasoning` / `coding`），由 adapter 映射为具体模型 ID |
 | **Source** | 远程 agent 定义来源（GitHub 仓库） |
 
@@ -60,7 +60,7 @@ AI coding agent 平台快速增长（Claude Code、Cursor、OpenCode、Codex、W
 1. **单一真实来源**：所有 agent 配置从 `.agents/roles/` 生成，禁止手动编辑生成产物
 2. **抽象优于具体**：canonical 定义使用 `tier: reasoning` 而非 `model: claude-opus-4.6`
 3. **安全默认**：deny-by-default 的权限模型，bash 白名单、委派白名单显式声明
-4. **渐进式采用**：可以只用编译器，不用包管理；可以只适配一个平台
+4. **渐进式采用**：可以只用渲染能力，不用包管理；可以只适配一个平台
 5. **可扩展**：adapter 通过 Python entry_points 注册，第三方可以开发新平台适配器
 
 ---
@@ -84,12 +84,12 @@ my-project/
 │
 │   # ── 以下为生成产物（应在 .gitignore 中忽略）──
 │
-├── .opencode/                      # ← compile --target opencode 生成
+├── .opencode/                      # ← render --target opencode 生成
 │   ├── agents/*.md
 │   └── opencode.json
-├── .cursor/                        # ← compile --target cursor 生成
+├── .cursor/                        # ← render --target cursor 生成
 │   └── rules/*.mdc
-└── .claude/                        # ← compile --target claude 生成
+└── .claude/                        # ← render --target claude 生成
     └── agents/*.md
 ```
 
@@ -105,7 +105,7 @@ agent-caster/
 │       ├── config.py               # refit.toml 解析
 │       ├── models.py               # AgentDef, TargetConfig 等数据模型
 │       ├── loader.py               # 加载 .agents/roles/*.md
-│       ├── compiler.py             # 编译调度器
+│       ├── renderer.py             # 渲染调度器
 │       ├── package.py              # 包管理（add/update）
 │       └── adapters/
 │           ├── base.py             # Adapter 基类/协议
@@ -139,9 +139,9 @@ skills:
   - repomix-explorer
 
 capabilities:
-  - read-code
-  - write-report
-  - web-read
+  - read
+  - write
+  - web-access
   - bash:
       - "npx repomix@latest*"
       - "bunx repomix@latest*"
@@ -182,8 +182,8 @@ prompt_file: string         # 外部 prompt 文件路径（相对于当前文件
 
 # 能力声明
 capabilities:
-  - read-code               # 预定义能力组（string）
-  - write-code
+  - read               # 预定义能力组（string）
+  - write
   - web-access
   - bash:                   # 结构化能力：bash 命令白名单
       - "pattern*"
@@ -195,13 +195,13 @@ capabilities:
 
 | 能力组 | 语义 | 典型展开 |
 |--------|------|----------|
-| `read-code` | 读取代码/文件 | read, glob, grep |
-| `write-code` | 编写/修改代码 | write, edit |
-| `write-report` | 写入报告/文档 | write |
+| `read` | 读取代码/文件 | read, glob, grep |
+| `write` | 编写/修改代码 | write, edit |
+| `write` | 写入报告/文档 | write |
 | `web-access` | 完整 web 访问 | webfetch, websearch |
-| `web-read` | 只读 web 访问 | webfetch |
+| `web-access` | 只读 web 访问 | webfetch |
 
-> 注意：具体展开结果因平台而异。`read-code` 在 OpenCode 中展开为 `{read: true, glob: true, grep: true}`，在 Cursor 中可能映射为不同的工具名。
+> 注意：具体展开结果因平台而异。`read` 在 OpenCode 中展开为 `{read: true, glob: true, grep: true}`，在 Cursor 中可能映射为不同的工具名。
 
 ### 4.4 用户自定义能力组
 
@@ -223,7 +223,7 @@ adapter 负责解释自定义能力组在对应平台的含义。
 
 ```toml
 [project]
-agents_dir = ".agents/roles"   # canonical 定义目录（默认值）
+roles_dir = ".agents/roles"   # canonical 定义目录（默认值）
 
 # ── 目标平台配置 ──
 
@@ -282,22 +282,22 @@ uvx agent-caster init
 2. 生成默认 `refit.toml`（交互式选择目标平台）
 3. 提示将生成目录（`.opencode/`、`.cursor/` 等）加入 `.gitignore`
 
-### 6.2 `agent-caster compile`
+### 6.2 `agent-caster render`
 
-编译 canonical 定义到目标平台。
+将 canonical 定义渲染到目标平台。
 
 ```bash
-uvx agent-caster compile                     # 编译到所有 enabled 的目标
-uvx agent-caster compile --target opencode   # 只编译到 opencode
-uvx agent-caster compile --target opencode --target claude  # 多目标
-uvx agent-caster compile --dry-run           # 预览输出，不写入文件
-uvx agent-caster compile --diff              # 显示与当前文件的差异
+uvx agent-caster render                     # 渲染到所有 enabled 的目标
+uvx agent-caster render --target opencode   # 只渲染到 opencode
+uvx agent-caster render --target opencode --target claude  # 多目标
+uvx agent-caster render --dry-run           # 预览输出，不写入文件
+uvx agent-caster render --diff              # 显示与当前文件的差异
 ```
 
 行为：
 1. 加载 `refit.toml` 配置
 2. 加载 `.agents/roles/*.md` 中所有 canonical 定义
-3. 对每个 enabled 的目标平台，调用对应 adapter 的 `compile()` 方法
+3. 对每个 enabled 的目标平台，调用对应 adapter 的渲染方法
 4. 写入生成文件（或 dry-run 打印）
 
 ### 6.3 `agent-caster add`
@@ -317,7 +317,7 @@ uvx agent-caster add ./path/to/local/agents  # 本地路径
 3. 如果指定 `--agents`，只复制选中的 agent 定义文件
 4. 复制到本地 `.agents/roles/`
 5. 在 `refit.toml` 的 `[[sources]]` 中记录来源信息
-6. 自动执行 `compile`
+6. 自动执行 `render`
 
 冲突处理：如果本地已有同名 agent，提示用户选择覆盖或跳过。
 
@@ -335,7 +335,7 @@ uvx agent-caster update github:PFCCLab/precision-agents  # 更新指定来源
 2. 对每个来源，re-fetch 最新版本
 3. 比较并更新本地 `.agents/roles/` 中对应的文件
 4. 显示变更摘要
-5. 自动执行 `compile`
+5. 自动执行 `render`
 
 ### 6.5 `agent-caster list`
 
@@ -357,7 +357,7 @@ precision-alignment     primary   reasoning  local
 
 ### 6.6 `agent-caster inspect`
 
-查看某个 agent 的详细信息和各平台编译结果预览。
+查看某个 agent 的详细信息和各平台输出预览。
 
 ```bash
 uvx agent-caster inspect explorer
@@ -370,7 +370,7 @@ Agent: explorer
   Role: subagent
   Tier: reasoning (temperature: 0.05)
   Skills: repomix-explorer
-  Capabilities: read-code, write-report, web-read, bash(2 patterns)
+  Capabilities: read, write, web-access, bash(2 patterns)
   Source: github:PFCCLab/precision-agents@main
 
   Compiled for opencode:
@@ -421,12 +421,12 @@ class Adapter(Protocol):
 
     name: str
 
-    def compile(
+    def render(
         self,
         agents: list[AgentDef],
         config: TargetConfig,
     ) -> list[OutputFile]:
-        """将 canonical agent 定义编译为平台特定的配置文件。"""
+        """将 canonical agent 定义渲染为平台特定的配置文件。"""
         ...
 ```
 
@@ -438,7 +438,7 @@ class Adapter(Protocol):
 - `opencode.json` — primary agent 配置
 - `.opencode/agents/{name}.md` — subagent 定义（YAML frontmatter + prompt）
 
-编译逻辑：从现有 `adapters/opencode/generate.py` 迁移。
+渲染逻辑：从现有 `adapters/opencode/generate.py` 迁移。
 
 #### Claude Code Adapter
 
@@ -447,8 +447,8 @@ class Adapter(Protocol):
 - `.claude/agents/{name}.md` — subagent 定义
 
 映射：
-- `read-code` → Read, Glob, Grep tools
-- `write-code` → Write, Edit tools
+- `read` → Read, Glob, Grep tools
+- `write` → Write, Edit tools
 - `bash` → Bash tool with allowedCommands
 - `delegate` → Task tool with allowedAgents
 
@@ -547,11 +547,11 @@ https://github.com/PFCCLab/precision-agents
 ```bash
 # 零安装运行（推荐）
 uvx agent-caster init
-uvx agent-caster compile
+uvx agent-caster render
 
 # 或全局安装
 pip install agent-caster
-agent-caster compile
+agent-caster render
 
 # 或项目依赖
 uv add --dev agent-caster
@@ -568,7 +568,7 @@ uv add --dev agent-caster
 - [ ] `refit.toml` 配置解析
 - [ ] OpenCode adapter（从现有 generate.py 迁移）
 - [ ] Claude Code adapter
-- [ ] CLI: `init`, `compile`, `compile --dry-run`, `list`
+- [ ] CLI: `init`, `render`, `render --dry-run`, `list`
 - [ ] PyPI 发布 + uvx 支持
 
 ### Phase 2: 包管理（v0.2）
@@ -601,7 +601,7 @@ adapters/opencode/         →  由 agent-caster 内置 opencode adapter 替代
 1. uvx agent-caster init
 2. mv agents/*.md .agents/roles/
 3. 配置 refit.toml（model_map 等）
-4. uvx agent-caster compile --target opencode
+4. uvx agent-caster render --target opencode
 5. 验证生成结果与原有一致
 6. 删除 adapters/ 目录
 ```
@@ -612,7 +612,7 @@ adapters/opencode/         →  由 agent-caster 内置 opencode adapter 替代
 
 | 特性 | Rulix | PRPM | Rulesify | **agent-caster** |
 |------|:---:|:---:|:---:|:---:|
-| **定位** | 规则同步 | 规则市场 | 规则同步 | **Agent 编译器** |
+| **定位** | 规则同步 | 规则市场 | 规则同步 | **Agent 分发与渲染工具** |
 | **管理对象** | 编码规范 | 规则/提示 | 编码规范 | **Agent 完整定义** |
 | **Model tier 抽象** | - | - | - | **Yes** |
 | **Capability 展开** | - | - | - | **Yes** |

@@ -1,0 +1,32 @@
+[project]
+site_name = "role-forge"
+site_description = "Canonical role-definition toolkit for coding agents"
+site_author = "Zhan Rongrui"
+site_url = "https://role-forge.sixbones.dev"
+repo_url = "https://github.com/zrr1999/role-forge"
+repo_name = "zrr1999/role-forge"
+edit_uri = "edit/main/docs/"
+docs_dir = "docs"
+site_dir = "site"
+nav = [
+  { "Home" = "index.md" },
+  { "Reference" = [
+    "reference/index.md",
+    { "Canonical Role Definition" = "reference/canonical-role-definition.md" },
+    { "CLI" = "reference/cli.md" },
+    { "Configuration" = "reference/configuration.md" },
+    { "Adapters" = "reference/adapters.md" },
+  ] },
+  { "Architecture" = [
+    "architecture/index.md",
+    { "System Overview" = "architecture/system-overview.md" },
+    { "Render Pipeline" = "architecture/render-pipeline.md" },
+    { "Project Structure" = "architecture/project-structure.md" },
+  ] },
+  { "Development" = [
+    "development/index.md",
+    { "Contributing" = "development/contributing.md" },
+    { "Toolchain" = "development/toolchain.md" },
+    { "Deployment" = "development/deployment.md" },
+  ] },
+]

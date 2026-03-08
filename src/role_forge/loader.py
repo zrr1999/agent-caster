@@ -7,41 +7,41 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from agent_caster.log import logger
-from agent_caster.models import AgentDef, HierarchyConfig, ModelConfig
+from role_forge.log import logger
+from role_forge.models import AgentDef, HierarchyConfig, ModelConfig
 
 
 class LoadError(Exception):
     """Raised when an agent definition file cannot be parsed."""
 
 
-def load_agents(agents_dir: Path, *, strict: bool = False) -> list[AgentDef]:
+def load_agents(roles_dir: Path, *, strict: bool = False) -> list[AgentDef]:
     """Load all agent definitions from a directory (recursively), sorted by name.
 
-    Walks *agents_dir* recursively so that role files stored in sub-directories
+    Walks *roles_dir* recursively so that role files stored in sub-directories
     (e.g. ``roles/team-a/scout.md``) are also discovered and loaded.
 
     By default, files that fail to parse are skipped with a warning so that
     one malformed definition does not block the rest.  Pass ``strict=True`` to
     re-raise the first parse error instead.
     """
-    if not agents_dir.is_dir():
-        raise LoadError(f"Agents directory not found: {agents_dir}")
+    if not roles_dir.is_dir():
+        raise LoadError(f"Agents directory not found: {roles_dir}")
 
     agents = []
-    for md_path in sorted(agents_dir.rglob("*.md")):
-        logger.debug(f"Loading agent from {md_path.relative_to(agents_dir)}")
+    for md_path in sorted(roles_dir.rglob("*.md")):
+        logger.debug(f"Loading agent from {md_path.relative_to(roles_dir)}")
         try:
-            agents.append(parse_agent_file(md_path, agents_dir=agents_dir))
+            agents.append(parse_agent_file(md_path, roles_dir=roles_dir))
         except LoadError as exc:
             if strict:
                 raise
-            logger.warning(f"Skipping {md_path.relative_to(agents_dir)}: {exc}", exc_info=True)
-    logger.debug(f"Loaded {len(agents)} agent(s) from {agents_dir}")
+            logger.warning(f"Skipping {md_path.relative_to(roles_dir)}: {exc}", exc_info=True)
+    logger.debug(f"Loaded {len(agents)} agent(s) from {roles_dir}")
     return agents
 
 
-def parse_agent_file(md_path: Path, *, agents_dir: Path | None = None) -> AgentDef:
+def parse_agent_file(md_path: Path, *, roles_dir: Path | None = None) -> AgentDef:
     """Parse a single agent definition file."""
     text = md_path.read_text(encoding="utf-8")
     fm_text, body = _split_frontmatter(text)
@@ -61,8 +61,8 @@ def parse_agent_file(md_path: Path, *, agents_dir: Path | None = None) -> AgentD
 
     prompt_content = _resolve_prompt(defn, body, md_path.parent)
     relative_path = (
-        md_path.resolve().relative_to(agents_dir.resolve()).as_posix()
-        if agents_dir is not None
+        md_path.resolve().relative_to(roles_dir.resolve()).as_posix()
+        if roles_dir is not None
         else md_path.name
     )
 

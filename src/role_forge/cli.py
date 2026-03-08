@@ -1,4 +1,4 @@
-"""CLI entry point for agent-caster."""
+"""CLI entry point for role-forge."""
 
 from __future__ import annotations
 
@@ -8,17 +8,18 @@ from typing import Annotated
 
 import typer
 
-from agent_caster import __version__
-from agent_caster.log import logger
+from role_forge import __version__
+from role_forge.adapters import list_adapters
+from role_forge.log import logger
 
 app = typer.Typer(
-    help="agent-caster: AI coding agent definition manager. Fetch, install, and cast across tools."
+    help=("role-forge: install canonical role definitions and render them across coding tools.")
 )
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        logger.info(f"agent-caster {__version__}")
+        logger.info(f"role-forge {__version__}")
         raise typer.Exit()
 
 
@@ -29,7 +30,7 @@ def main(
         typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version"),
     ] = None,
 ) -> None:
-    """agent-caster: AI coding agent definition manager."""
+    """role-forge: install canonical role definitions and render them across tools."""
 
 
 def _resolve_target_config(
@@ -39,8 +40,8 @@ def _resolve_target_config(
     interactive: bool = True,
 ):
     """Build TargetConfig: roles.toml > adapter defaults > interactive prompt."""
-    from agent_caster.config import find_config, load_config
-    from agent_caster.models import TargetConfig
+    from role_forge.config import find_config, load_config
+    from role_forge.models import TargetConfig
 
     # 1. Try roles.toml (or legacy refit.toml with deprecation warning)
     config_path = find_config(project)
@@ -76,6 +77,49 @@ def _resolve_target_config(
         f"No model_map for '{target_name}'. Add [targets.{target_name}.model_map] to roles.toml."
     )
     raise typer.Exit(1)
+
+
+def _resolve_project(project_dir: str | None) -> Path:
+    return Path(project_dir).resolve() if project_dir else Path.cwd()
+
+
+def _resolve_roles_dir(project: Path) -> Path:
+    from role_forge.config import resolve_roles_dir
+
+    return resolve_roles_dir(project)
+
+
+def _load_installed_agents(project: Path):
+    from role_forge.loader import load_agents
+
+    roles_dir = _resolve_roles_dir(project)
+    if not roles_dir.is_dir():
+        logger.error("No roles found. Run 'role-forge add' first.")
+        raise typer.Exit(1)
+    return roles_dir, load_agents(roles_dir)
+
+
+def _render_agents_to_targets(project: Path, agents, target_names: list[str]) -> None:
+    from role_forge.adapters import get_adapter
+    from role_forge.topology import TopologyError
+
+    for target_name in target_names:
+        try:
+            adapter = get_adapter(target_name)
+        except ValueError as e:
+            logger.error(str(e))
+            continue
+
+        config = _resolve_target_config(target_name, adapter, project)
+
+        try:
+            outputs = adapter.cast(agents, config)
+        except TopologyError as e:
+            logger.error(str(e))
+            raise typer.Exit(1) from e
+
+        _write_outputs(project, outputs, config.output_dir)
+        logger.info(f"Rendered {len(outputs)} roles -> {target_name}")
 
 
 def _write_outputs(project: Path, outputs, output_dir: str) -> None:
@@ -119,11 +163,12 @@ def add(
     ] = None,
 ) -> None:
     """Add agent definitions from a source."""
-    from agent_caster.adapters import get_adapter
-    from agent_caster.loader import load_agents
-    from agent_caster.platform import detect_platforms
-    from agent_caster.registry import fetch_source, find_agents_dir, parse_source
-    from agent_caster.topology import TopologyError, validate_agents
+    from role_forge.loader import load_agents
+    from role_forge.platform import detect_platforms
+    from role_forge.registry import fetch_source, find_roles_dir, parse_source
+    from role_forge.topology import TopologyError, validate_agents
+
+    del yes
 
     parsed = parse_source(source)
 
@@ -134,12 +179,12 @@ def add(
         raise typer.Exit(1) from e
 
     try:
-        agents_dir = find_agents_dir(repo_path)
+        roles_dir = find_roles_dir(repo_path)
     except FileNotFoundError as e:
         logger.error(str(e))
         raise typer.Exit(1) from e
 
-    agents = load_agents(agents_dir)
+    agents = load_agents(roles_dir)
     if not agents:
         logger.error("No agent definitions found in source.")
         raise typer.Exit(1)
@@ -157,8 +202,8 @@ def add(
     if global_install:
         install_dir = Path.home() / ".agents" / "roles"
     else:
-        project = Path(project_dir).resolve() if project_dir else Path.cwd()
-        install_dir = project / ".agents" / "roles"
+        project = _resolve_project(project_dir)
+        install_dir = _resolve_roles_dir(project)
 
     install_dir.mkdir(parents=True, exist_ok=True)
 
@@ -176,7 +221,7 @@ def add(
     if global_install and not target:
         return
 
-    project = Path(project_dir).resolve() if project_dir else Path.cwd()
+    project = _resolve_project(project_dir)
 
     cast_targets = list(target) if target else detect_platforms(project)
 
@@ -185,22 +230,7 @@ def add(
 
     installed_agents = load_agents(install_dir)
     for target_name in cast_targets:
-        try:
-            adapter = get_adapter(target_name)
-        except ValueError:
-            logger.error(f"Unknown target: {target_name}")
-            continue
-
-        config = _resolve_target_config(target_name, adapter, project)
-
-        try:
-            outputs = adapter.cast(installed_agents, config)
-        except TopologyError as e:
-            logger.error(str(e))
-            raise typer.Exit(1) from e
-        _write_outputs(project, outputs, config.output_dir)
-
-        logger.info(f"Cast {len(outputs)} agents → {target_name}")
+        _render_agents_to_targets(project, installed_agents, [target_name])
 
 
 @app.command("list")
@@ -210,16 +240,8 @@ def list_agents(
     ] = None,
 ) -> None:
     """List all installed agent definitions."""
-    from agent_caster.loader import load_agents
-
-    project = Path(project_dir).resolve() if project_dir else Path.cwd()
-    agents_dir = project / ".agents" / "roles"
-
-    if not agents_dir.is_dir():
-        logger.error("No agents found. Run 'agent-caster add' first.")
-        raise typer.Exit(1)
-
-    agents = load_agents(agents_dir)
+    project = _resolve_project(project_dir)
+    _, agents = _load_installed_agents(project)
 
     logger.info(f"{'AGENT':<25} {'ID':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
     logger.info("-" * 82)
@@ -230,7 +252,50 @@ def list_agents(
             f"{agent.model.tier:<12} {temp:<6}"
         )
 
-    logger.info(f"\n{len(agents)} agents found")
+    logger.info(f"\n{len(agents)} roles found")
+
+
+def _render_command(
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
+    ] = None,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Render installed role definitions to platform-specific configs."""
+    from role_forge.platform import detect_platforms
+    from role_forge.topology import TopologyError, validate_agents
+
+    project = _resolve_project(project_dir)
+    _, agents = _load_installed_agents(project)
+    try:
+        validate_agents(agents)
+    except TopologyError as e:
+        logger.error(str(e))
+        raise typer.Exit(1) from e
+    cast_targets = list(target) if target else detect_platforms(project)
+
+    if not cast_targets:
+        logger.error(
+            f"No platforms detected. Use --target to specify one of: {', '.join(list_adapters())}"
+        )
+        raise typer.Exit(1)
+
+    _render_agents_to_targets(project, agents, cast_targets)
+
+
+@app.command()
+def render(
+    target: Annotated[
+        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
+    ] = None,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Render installed role definitions to platform-specific configs."""
+    _render_command(target=target, project_dir=project_dir)
 
 
 @app.command()
@@ -242,73 +307,26 @@ def cast(
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Cast installed agent definitions to platform-specific configs."""
-    from agent_caster.adapters import get_adapter
-    from agent_caster.loader import load_agents
-    from agent_caster.platform import detect_platforms
-    from agent_caster.topology import TopologyError, validate_agents
-
-    project = Path(project_dir).resolve() if project_dir else Path.cwd()
-    agents_dir = project / ".agents" / "roles"
-
-    if not agents_dir.is_dir():
-        logger.error("No agents found. Run 'agent-caster add' first.")
-        raise typer.Exit(1)
-
-    agents = load_agents(agents_dir)
-    try:
-        validate_agents(agents)
-    except TopologyError as e:
-        logger.error(str(e))
-        raise typer.Exit(1) from e
-    cast_targets = list(target) if target else detect_platforms(project)
-
-    if not cast_targets:
-        logger.error("No platforms detected. Use --target to specify.")
-        raise typer.Exit(1)
-
-    for target_name in cast_targets:
-        try:
-            adapter = get_adapter(target_name)
-        except ValueError as e:
-            logger.error(str(e))
-            continue
-
-        config = _resolve_target_config(target_name, adapter, project)
-
-        try:
-            outputs = adapter.cast(agents, config)
-        except TopologyError as e:
-            logger.error(str(e))
-            raise typer.Exit(1) from e
-        _write_outputs(project, outputs, config.output_dir)
-
-        logger.info(f"Cast {len(outputs)} agents → {target_name}")
+    """Legacy alias for `render`."""
+    _render_command(target=target, project_dir=project_dir)
 
 
 @app.command()
 def remove(
     agent_name: Annotated[str, typer.Argument(help="Agent canonical id or unique name to remove")],
-    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
     """Remove an installed agent definition."""
-    from agent_caster.loader import load_agents
-
-    project = Path(project_dir).resolve() if project_dir else Path.cwd()
-    agents_dir = project / ".agents" / "roles"
-    if not agents_dir.is_dir():
-        logger.error("No agents found. Run 'agent-caster add' first.")
-        raise typer.Exit(1)
-
-    agent = _resolve_remove_target(load_agents(agents_dir), agent_name)
-    agent_file = agents_dir / agent.install_relative_path()
+    project = _resolve_project(project_dir)
+    roles_dir, agents = _load_installed_agents(project)
+    agent = _resolve_remove_target(agents, agent_name)
+    agent_file = roles_dir / agent.install_relative_path()
     agent_file.unlink()
     logger.info(f"Removed {agent.canonical_id}")
     logger.info(
-        "Note: platform-specific files may still exist. Run 'agent-caster cast' to regenerate."
+        "Note: platform-specific files may still exist. Run 'role-forge render' to regenerate."
     )
 
 
@@ -324,7 +342,7 @@ def update(
     ] = None,
 ) -> None:
     """Update agent definitions from a previously added source."""
-    from agent_caster.registry import parse_source
+    from role_forge.registry import parse_source
 
     parsed = parse_source(source)
     if parsed.is_local:

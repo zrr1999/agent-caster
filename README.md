@@ -1,122 +1,54 @@
-# agent-caster
+# role-forge
 
-AI coding agent definition manager. Fetch, install, and cast across tools.
+Canonical role-definition toolkit for coding agents.
 
-## Why
+`role-forge` keeps one canonical role source and renders it into platform-specific agent formats for tools like Claude Code, OpenCode, Cursor, and Windsurf.
 
-AI coding agent 工具（Claude Code、OpenCode、Cursor、Codex、Windsurf、Aider...）各有自己的 agent 配置格式。团队维护多工具 agent 定义面临配置碎片化、工具锁定和安全配置重复维护等问题。
-
-**agent-caster** 让你从 GitHub 安装可复用的 agent 定义，并自动适配到各工具的配置格式。
-
-| 能力 | 支持 |
-|------|:---:|
-| 从 GitHub 安装 agent 定义 | ✅ |
-| 多工具输出（Claude Code / OpenCode / ...） | ✅ |
-| Model tier 抽象（reasoning / coding） | ✅ |
-| Capability group 展开 | ✅ |
-| 权限 / 委派建模 | ✅ |
-
-## Installation
+## Install
 
 ```bash
-uv tool install agent-caster
+uv tool install role-forge
 ```
 
-## Quick Start
+## Quick start
 
 ```bash
-# 从 GitHub 安装 agent 定义（交互式选择）
-agent-caster add PFCCLab/precision-agents
-
-# 跳过交互，安装全部并自动 cast
-agent-caster add PFCCLab/precision-agents -y
-
-# 安装到全局
-agent-caster add PFCCLab/precision-agents -y --global
-
-# 从本地路径安装
-agent-caster add ./my-agents
-
-# 指定 cast 目标
-agent-caster add PFCCLab/precision-agents -y --target claude
-
-# 列出已安装的 agent
-agent-caster list
-
-# 重新 cast 到平台格式
-agent-caster cast --target claude
-
-# 更新已安装的 agent
-agent-caster update PFCCLab/precision-agents
-
-# 移除 agent
-agent-caster remove explorer
+role-forge add PFCCLab/precision-agents -y
+role-forge render --target claude
+role-forge list
 ```
 
-## Canonical Agent Definition
+## Why this repo exists
 
-在 `roles/` 下使用 YAML frontmatter + Markdown 编写 agent 定义：
+- avoid maintaining the same role prompt in multiple tool-specific formats
+- keep capabilities, delegation policy, and model tiers in one canonical source
+- validate hierarchy and output layout before rendering
+- support extension through adapter entry points
 
-```markdown
----
-name: explorer
-description: Code Explorer. Reads and analyzes source code.
-role: subagent
+## Capability model
 
-model:
-  tier: reasoning
-  temperature: 0.05
+Canonical roles declare abstract capabilities such as `basic`, `read`, `write`, `web-access`, `delegate`, `bash`, `safe-bash`, and `all`. `role-forge` expands those once into a shared intermediate capability model, then each adapter renders the matching tools and permissions for its target. If a role omits capabilities entirely, `basic` is applied by default.
 
-skills:
-  - repomix-explorer
+## Documentation
 
-capabilities:
-  - read-code
-  - write-report
-  - web-read
-  - bash:
-      - "npx repomix@latest*"
+- live site: `https://role-forge.sixbones.dev`
+- docs home: `docs/index.md`
+- canonical role format: `docs/reference/canonical-role-definition.md`
+- CLI reference: `docs/reference/cli.md`
+- configuration: `docs/reference/configuration.md`
+- adapters: `docs/reference/adapters.md`
+- architecture: `docs/architecture/system-overview.md`
+- development: `docs/development/contributing.md`
+- deployment: `docs/development/deployment.md`
 
-level: L3
-class: leaf
-callable: true
-scheduled: false
-max_delegate_depth: 0
----
+## Documentation site
 
-# Explorer
-
-Read-only code exploration agent. Traces execution paths and produces reports.
-```
-
-## Source Repo Convention
-
-agent-caster 从源仓库中查找 agent 定义：
-
-1. 有 `refit.toml` 且指定 `agents_dir` → 使用该路径
-2. 否则 → 默认 `roles/*.md`
-
-`roles.toml` 的 target 现在也支持 `output_layout = "preserve" | "namespace" | "flatten"`，
-可用于保留嵌套 `roles/` 的路径语义或显式启用扁平化输出。
-
-## Supported Tools
-
-| Tool | Adapter | Output |
-|------|---------|--------|
-| Claude Code | `claude` | `.claude/agents/*.md` |
-| OpenCode | `opencode` | `.opencode/agents/*.md` |
-| Cursor | `cursor` | `.cursor/agents/*.mdc` |
-
-更多工具适配器开发中。
-
-## Development
+This repo now includes a Zensical doc set inspired by the structure used in `volvox`.
 
 ```bash
-just install   # 安装依赖
-just ci        # 完整 CI 流程（format + lint + check + test）
+uv add --dev zensical
+zensical serve
 ```
-
-详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## License
 

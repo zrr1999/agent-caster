@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from pathlib import PurePosixPath
 
-from agent_caster.models import AgentDef, TargetConfig
+from role_forge.models import AgentDef, TargetConfig
 
 _LEVEL_RE = re.compile(r"[Ll]?(\d+)$")
 

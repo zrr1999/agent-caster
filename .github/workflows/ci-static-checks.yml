@@ -11,14 +11,10 @@ permissions:
 
 jobs:
   code-style-check:
-    name: lint and fmt
+    name: Code Style Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
       - name: Run prek
         uses: j178/prek-action@v1
 
@@ -28,10 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install the latest version of uv 📦
-        uses: astral-sh/setup-uv@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
 
       - name: Type check
         run: |
-          uv sync --all-extras --dev
-          uvx ty check
+          uv sync --group dev
+          uvx ty check src/

@@ -23,16 +23,31 @@ check:
 
 # Run tests (quick, no coverage)
 test:
-    uv run pytest
+    uv run python -m pytest
 
 # Run tests with coverage
 cov:
-    uv run pytest --cov=agent_caster --cov-report=term-missing
-    uv run coverage xml
+    uv run python -m pytest --cov=role_forge --cov-report=term-missing
+    uv run python -m coverage xml
+
+# Run CodSpeed benchmarks
+bench:
+    uv run --with pytest-codspeed python -m pytest tests/test_topology.py --codspeed
 
 # Run pre-commit on all files
 pre-commit:
     uvx prek run --all-files
+
+# Preview documentation locally
+docs-serve:
+    uv run zensical serve
+
+# Build documentation site
+docs-build:
+    uv run zensical build
+
+# Verify documentation can build
+docs-check: docs-build
 
 # Full CI check (format + lint + check + test)
 ci: format lint check test

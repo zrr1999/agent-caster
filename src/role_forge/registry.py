@@ -1,11 +1,12 @@
-"""Source parsing and git operations for agent-caster registry."""
+"""Source parsing and git operations for role-forge registry."""
 
 from __future__ import annotations
 
 import subprocess
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+from role_forge.config import find_config, load_config
 
 
 @dataclass
@@ -62,7 +63,7 @@ def parse_source(source: str) -> ParsedSource:
     return ParsedSource(org=parts[0], repo=parts[1], ref=ref)
 
 
-CACHE_DIR = Path.home() / ".config" / "agent-caster" / "repos"
+CACHE_DIR = Path.home() / ".config" / "role-forge" / "repos"
 
 
 def fetch_source(source: ParsedSource, cache_root: Path | None = None) -> Path:
@@ -116,29 +117,19 @@ def _git_fetch(repo_dir: Path, ref: str | None) -> None:
     )
 
 
-def find_agents_dir(repo_path: Path) -> Path:
+def find_roles_dir(repo_path: Path) -> Path:
     """Find agent definitions directory in a fetched repo.
 
     Priority:
-    1. roles.toml agents_dir setting  (canonical)
-    2. refit.toml agents_dir setting  (legacy — deprecated)
+    1. roles.toml roles_dir / agents_dir setting
+    2. refit.toml roles_dir / agents_dir setting  (legacy - deprecated)
     3. roles/ directory
     """
-    _CANONICAL = "roles.toml"
-    _LEGACY = "refit.toml"
-
-    # Check canonical name first, then legacy
-    for config_name in (_CANONICAL, _LEGACY):
-        config_path = repo_path / config_name
-        if config_path.is_file():
-            with open(config_path, "rb") as f:
-                data = tomllib.load(f)
-            agents_dir_name = data.get("project", {}).get("agents_dir")
-            if agents_dir_name:
-                agents_dir = repo_path / agents_dir_name
-                if agents_dir.is_dir():
-                    return agents_dir
-            break  # found a config file (even if agents_dir key was absent) — stop looking
+    config_path = find_config(repo_path)
+    if config_path is not None:
+        roles_dir = repo_path / load_config(config_path).roles_dir
+        if roles_dir.is_dir():
+            return roles_dir
 
     # Default fallback
     roles_dir = repo_path / "roles"
@@ -147,5 +138,5 @@ def find_agents_dir(repo_path: Path) -> Path:
 
     raise FileNotFoundError(
         f"No agent definitions found in {repo_path}. "
-        "Expected 'roles.toml' (or legacy 'refit.toml') with agents_dir, or a roles/ directory."
+        "Expected 'roles.toml' (or legacy 'refit.toml') with roles_dir, or a roles/ directory."
     )

@@ -10,8 +10,8 @@ model:
 skills: []
 
 capabilities:
-  - read-code
-  - write-code
+  - read
+  - write
 ---
 
 # Aligner

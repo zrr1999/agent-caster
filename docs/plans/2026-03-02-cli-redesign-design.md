@@ -1,10 +1,10 @@
-# agent-caster CLI 重设计：从编译器到包管理器
+# agent-caster CLI 重设计：从单纯生成工具到角色分发与渲染工具
 
 > 2026-03-02
 
 ## 1. 定位转变
 
-agent-caster 从 **编译器** 转变为 **包管理器 + 编译器**：
+agent-caster 从 **单纯生成工具** 转变为 **包管理器 + 渲染工具**：
 
 - **核心动作**：`add` — 从 GitHub 拉取 agent 定义到本地
 - **辅助动作**：`cast` — 将 canonical 定义转换为平台特定格式（桥接过渡期）
@@ -109,7 +109,7 @@ PFCCLab/precision-agents@v1.0           → github.com/PFCCLab/precision-agents 
 ### 3.2 源 repo 约定
 
 查找 agent 定义：
-1. 有 `refit.toml` 且指定 `agents_dir` → 用该路径
+1. 有 `refit.toml` 且指定 `roles_dir` → 用该路径
 2. 否则 → 默认 `roles/*.md`
 
 ### 3.3 工具缓存

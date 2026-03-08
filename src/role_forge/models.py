@@ -1,10 +1,9 @@
-"""Data models for agent-caster."""
+"""Data models for role-forge."""
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from pathlib import Path, PurePosixPath
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,7 +38,8 @@ class HierarchyConfig(BaseModel, frozen=True):
 class AgentDef(BaseModel, frozen=True):
     """Parsed canonical agent definition.
 
-    Capabilities are stored as raw data -- expansion is the adapter's job.
+    Capabilities are stored as raw data. Empty capability lists default to `basic`
+    during centralized expansion.
     """
 
     name: str
@@ -113,8 +113,15 @@ class TargetConfig(BaseModel, frozen=True):
 class ProjectConfig(BaseModel, frozen=True):
     """Full parsed roles.toml configuration."""
 
-    agents_dir: str = ".agents/roles"
+    model_config = ConfigDict(populate_by_name=True)
+
+    roles_dir: str = Field(default=".agents/roles", alias="roles_dir")
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
+
+    @property
+    def agents_dir(self) -> str:
+        """Backward-compatible alias for legacy config terminology."""
+        return self.roles_dir
 
 
 class OutputFile(BaseModel, frozen=True):
@@ -122,13 +129,3 @@ class OutputFile(BaseModel, frozen=True):
 
     path: str  # relative to output_dir
     content: str
-
-
-class BaseAdapter(BaseModel):
-    """Base class for platform adapters."""
-
-    name: ClassVar[str]
-    default_model_map: ClassVar[dict[str, str]] = {}
-
-    @abstractmethod
-    def cast(self, agents: list[AgentDef], config: TargetConfig) -> list[OutputFile]: ...
