@@ -85,3 +85,14 @@ just ci        # 完整 CI 流程（format + lint + check + test）
 - `MAJOR` — 不兼容的 API 变更
 - `MINOR` — 向后兼容的新功能
 - `PATCH` — 向后兼容的 bug 修复
+
+## 发布
+
+本地可直接执行：
+
+```bash
+uv build
+uv publish
+```
+
+CI 发布工作流位于 `/.github/workflows/ci-publish.yml`。

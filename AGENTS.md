@@ -14,6 +14,8 @@ just format        # 格式化代码
 just lint          # Lint 检查
 just check         # 类型检查
 just test          # 运行测试
+uv build           # 构建发布产物
+uv publish         # 发布到 PyPI
 just cov           # 测试 + 覆盖率
 just ci            # 完整 CI 流程（format + lint + check + test）
 just pre-commit    # 运行 pre-commit 钩子

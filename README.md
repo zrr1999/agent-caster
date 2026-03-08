@@ -25,13 +25,20 @@ AI coding agent 工具（Claude Code、OpenCode、Cursor、Codex、Windsurf、Ai
 uv tool install role-forge
 ```
 
+发布到 PyPI 时，可直接使用：
+
+```bash
+uv build
+uv publish
+```
+
 ## Quick Start
 
 ```bash
 # 从 GitHub 安装 role definitions（交互式选择）
 role-forge add PFCCLab/precision-agents
 
-# 跳过交互，安装全部并自动 cast
+# 跳过交互，安装全部并自动 render
 role-forge add PFCCLab/precision-agents -y
 
 # 安装到全局
@@ -49,7 +56,7 @@ role-forge list
 # 重新 render 到平台格式
 role-forge render --target claude
 
-# 更新已安装的 agent
+# 更新已安装的 role definitions
 role-forge update PFCCLab/precision-agents
 
 # 移除 agent
@@ -135,6 +142,19 @@ CLI 中 `cast` 仍可用，但 `render` 是推荐名称。
 uv tool install role-forge
 role-forge render
 ```
+
+## Release
+
+当前包版本是 `0.0.1`。
+
+本地发布流程：
+
+```bash
+uv build
+uv publish
+```
+
+GitHub Actions 发布流程定义在 `/.github/workflows/ci-publish.yml`，用于 tag 触发发布。
 
 ## Development
 
