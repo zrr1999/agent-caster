@@ -118,7 +118,7 @@ class ProjectConfig(BaseModel, frozen=True):
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
 
     @property
-    def roles_dir(self) -> str:
+    def agents_dir(self) -> str:
         """Backward-compatible alias for legacy config terminology."""
         return self.roles_dir
 

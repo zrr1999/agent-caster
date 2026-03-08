@@ -19,7 +19,6 @@ coding = "claude-sonnet-4"
 ## Project keys
 
 - `roles_dir`: canonical role install directory inside the project
-- `roles_dir`: legacy alias, still accepted for backward compatibility
 
 ## Target keys
 
@@ -33,7 +32,7 @@ coding = "claude-sonnet-4"
 
 When reading a source repository, `role-forge` resolves role files in this order:
 
-1. `roles.toml` with `project.roles_dir` or legacy `project.roles_dir`
+1. `roles.toml` with `project.roles_dir` or legacy `project.agents_dir`
 2. legacy `refit.toml` with the same keys
 3. fallback `roles/`
 

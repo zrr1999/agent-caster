@@ -121,8 +121,8 @@ def find_roles_dir(repo_path: Path) -> Path:
     """Find agent definitions directory in a fetched repo.
 
     Priority:
-    1. roles.toml roles_dir / roles_dir setting
-    2. refit.toml roles_dir / roles_dir setting  (legacy — deprecated)
+    1. roles.toml roles_dir / agents_dir setting
+    2. refit.toml roles_dir / agents_dir setting  (legacy - deprecated)
     3. roles/ directory
     """
     config_path = find_config(repo_path)
