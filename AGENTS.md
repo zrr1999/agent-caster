@@ -41,3 +41,11 @@ src/agent_caster/
 2. 在 `adapters/__init__.py` 的 `_REGISTRY` 中注册
 3. 在 `pyproject.toml` 的 `[project.entry-points."agent_caster.adapters"]` 中注册
 4. 在 `tests/` 下添加对应的 snapshot 测试
+
+## Cursor Cloud specific instructions
+
+- **No services to run.** This is a pure Python CLI tool with no long-running processes, databases, or Docker dependencies.
+- **System deps:** `uv` (Python package manager) and `just` (task runner) must be on `$PATH`. Both install to `~/.local/bin`.
+- **Git hooks caveat:** `uvx prek install` (run by `just install`) may fail if `core.hooksPath` is already set in git config. Fix with `git config --unset-all --local core.hooksPath` before running `just install`.
+- **Interactive prompts:** The `agent-caster cast --target cursor` command prompts interactively for model config when no model mapping exists. For non-interactive testing, use `--target claude` or `--target opencode` instead.
+- All dev commands (`just lint`, `just check`, `just test`, `just ci`) are documented in the "开发命令" section above.
