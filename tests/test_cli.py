@@ -8,6 +8,7 @@ from io import StringIO
 
 from typer.testing import CliRunner
 
+from role_forge import __version__
 from role_forge.cli import app
 from role_forge.legacy_cli import main as legacy_main
 
@@ -18,7 +19,7 @@ def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "role-forge" in result.output
-    assert "0.0.1" in result.output
+    assert __version__ in result.output
 
 
 def test_legacy_cli_shows_rename_hint():
