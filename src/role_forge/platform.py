@@ -23,3 +23,22 @@ def detect_platforms(project_dir: Path) -> list[str]:
         if any((project_dir / m).exists() for m in markers):
             found.append(name)
     return found
+
+
+def resolve_targets(project_dir: Path) -> list[str]:
+    """Determine which targets to render for a project.
+
+    Priority:
+    1. Enabled targets from ``roles.toml`` (if the file exists and has targets).
+    2. Auto-detected platforms via filesystem markers.
+    """
+    from role_forge.config import find_config, load_config
+
+    config_path = find_config(project_dir)
+    if config_path is not None:
+        project_config = load_config(config_path)
+        configured = [name for name, cfg in project_config.targets.items() if cfg.enabled]
+        if configured:
+            return configured
+
+    return detect_platforms(project_dir)
