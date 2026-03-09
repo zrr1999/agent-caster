@@ -164,7 +164,7 @@ def add(
 ) -> None:
     """Add agent definitions from a source."""
     from role_forge.loader import load_agents
-    from role_forge.platform import detect_platforms
+    from role_forge.platform import resolve_targets
     from role_forge.registry import fetch_source, find_roles_dir, parse_source
     from role_forge.topology import TopologyError, validate_agents
 
@@ -223,7 +223,7 @@ def add(
 
     project = _resolve_project(project_dir)
 
-    cast_targets = list(target) if target else detect_platforms(project)
+    cast_targets = list(target) if target else resolve_targets(project)
 
     if not cast_targets:
         return
@@ -264,7 +264,7 @@ def _render_command(
     ] = None,
 ) -> None:
     """Render installed role definitions to platform-specific configs."""
-    from role_forge.platform import detect_platforms
+    from role_forge.platform import resolve_targets
     from role_forge.topology import TopologyError, validate_agents
 
     project = _resolve_project(project_dir)
@@ -274,7 +274,7 @@ def _render_command(
     except TopologyError as e:
         logger.error(str(e))
         raise typer.Exit(1) from e
-    cast_targets = list(target) if target else detect_platforms(project)
+    cast_targets = list(target) if target else resolve_targets(project)
 
     if not cast_targets:
         logger.error(

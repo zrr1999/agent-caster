@@ -315,6 +315,43 @@ def test_remove_nonexistent(tmp_path):
 # -- update command ------------------------------------------------------------
 
 
+def test_render_uses_roles_toml_targets_without_flag(tmp_path):
+    """render without --target should use targets from roles.toml, not filesystem detection."""
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text(
+        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
+    )
+
+    # Create filesystem markers for claude AND cursor
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".cursor").mkdir()
+
+    # But only configure opencode and claude in roles.toml
+    (tmp_path / "roles.toml").write_text(
+        '[project]\nroles_dir = "roles"\n'
+        "[targets.opencode]\n"
+        "enabled = true\n"
+        "[targets.opencode.model_map]\n"
+        'reasoning = "r"\ncoding = "c"\n'
+        "[targets.claude]\n"
+        "enabled = true\n"
+        "[targets.claude.model_map]\n"
+        'reasoning = "opus"\ncoding = "sonnet"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["render", "--project-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    # Should render opencode and claude (from roles.toml), NOT cursor (filesystem only)
+    assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
+    assert (tmp_path / ".opencode" / "agents" / "explorer.md").is_file()
+    assert not (tmp_path / ".cursor" / "agents" / "explorer.mdc").exists()
+
+
 def test_update_rejects_local():
     result = runner.invoke(app, ["update", "./local/path"])
     assert result.exit_code == 1
