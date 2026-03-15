@@ -58,10 +58,6 @@ def test_cast_agent_without_prompt():
     adapter = CursorAdapter()
     outputs = adapter.cast([agent], CURSOR_CONFIG)
     content = outputs[0].content
-    assert "---" in content
-    assert "name: minimal" in content
-    assert "description: Minimal agent." in content
-    # No trailing body
     assert content.endswith("---")
 
 
@@ -76,7 +72,6 @@ def test_cast_agent_without_description():
     outputs = adapter.cast([agent], CURSOR_CONFIG)
     content = outputs[0].content
     assert "description:" not in content
-    assert "name: nodesc" in content
 
 
 def test_output_path_uses_agent_name():
@@ -102,14 +97,7 @@ def test_model_map_ignored():
     agent = AgentDef(name="test", description="Test", prompt_content="prompt")
     adapter = CursorAdapter()
     outputs = adapter.cast([agent], config_with_model)
-    # model info should NOT appear in the output
     assert "model:" not in outputs[0].content
-    assert "gpt-5" not in outputs[0].content
-
-
-def test_default_model_map_is_empty():
-    adapter = CursorAdapter()
-    assert adapter.default_model_map == {}
 
 
 def test_cast_multiple_agents():

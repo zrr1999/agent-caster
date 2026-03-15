@@ -1,7 +1,5 @@
 """Adapter registry."""
 
-from __future__ import annotations
-
 from importlib.metadata import entry_points
 
 from role_forge.adapters.base import BaseAdapter

@@ -12,9 +12,9 @@ class ModelConfig(BaseModel, frozen=True):
     """Model configuration from agent frontmatter.
 
     ``tier`` maps to an entry in the target's ``model_map`` inside
-    ``refit.toml``.  Built-in values are ``"reasoning"`` and ``"coding"``,
+    ``roles.toml``. Built-in values are ``"reasoning"`` and ``"coding"``,
     but any custom string is accepted so that projects can define their own
-    tier vocabulary (e.g. ``"deep"``, ``"lite"``, ``"refit"``).  Unknown
+    tier vocabulary (e.g. ``"deep"``, ``"lite"``, ``"research"``). Unknown
     tiers fall back to the ``"reasoning"`` mapping at cast time.
     """
 
@@ -117,11 +117,6 @@ class ProjectConfig(BaseModel, frozen=True):
 
     roles_dir: str = Field(default=".agents/roles", alias="roles_dir")
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
-
-    @property
-    def agents_dir(self) -> str:
-        """Backward-compatible alias for legacy config terminology."""
-        return self.roles_dir
 
 
 class OutputFile(BaseModel, frozen=True):

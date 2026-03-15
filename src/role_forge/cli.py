@@ -2,24 +2,41 @@
 
 from __future__ import annotations
 
+import json
 import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 import typer
+from loguru import logger
 
 from role_forge import __version__
 from role_forge.adapters import list_adapters
-from role_forge.log import logger
+
+# Default: only WARNING and above so INFO/DEBUG are hidden unless configured elsewhere.
+logger.remove()
+logger.add(sys.stderr, level="WARNING")
 
 app = typer.Typer(
     help=("role-forge: install canonical role definitions and render them across coding tools.")
 )
 
+Scope = Literal["project", "user"]
+
+
+@dataclass(frozen=True)
+class InstallPlan:
+    install_dir: Path
+    new_agents: list[Any]
+    overwrite_agents: list[Any]
+
 
 def _version_callback(value: bool) -> None:
     if value:
-        logger.info(f"role-forge {__version__}")
+        _info(f"role-forge {__version__}")
         raise typer.Exit()
 
 
@@ -33,17 +50,58 @@ def main(
     """role-forge: install canonical role definitions and render them across tools."""
 
 
+def _style(text: str, *, fg: str | None = None, bold: bool = False) -> str:
+    return typer.style(text, fg=fg, bold=bold)
+
+
+def _info(message: str) -> None:
+    typer.echo(_style(message, fg=typer.colors.CYAN))
+
+
+def _success(message: str) -> None:
+    typer.echo(_style(message, fg=typer.colors.GREEN, bold=True))
+
+
+def _warn(message: str) -> None:
+    typer.echo(_style(message, fg=typer.colors.YELLOW, bold=True))
+
+
+def _error(message: str) -> None:
+    # Errors are printed to stdout so that Typer's CliRunner (and users) can always see them.
+    typer.echo(_style(message, fg=typer.colors.RED, bold=True))
+
+
+def _dim(text: str) -> str:
+    return typer.style(text, fg=typer.colors.BRIGHT_BLACK)
+
+
+def _bullet(label: str, value: str = "") -> str:
+    if value:
+        return f"  {_style('•', fg=typer.colors.BLUE)} {label}: {value}"
+    return f"  {_style('•', fg=typer.colors.BLUE)} {label}"
+
+
 def _resolve_target_config(
     target_name: str,
     adapter,
     project: Path,
     interactive: bool = True,
+    source_project: Path | None = None,
 ):
-    """Build TargetConfig: roles.toml > adapter defaults > interactive prompt."""
+    """TargetConfig: source repo toml > project toml > adapter defaults. No model prompt."""
     from role_forge.config import find_config, load_config
     from role_forge.models import TargetConfig
 
-    # 1. Try roles.toml (or legacy refit.toml with deprecation warning)
+    # Prefer source repo roles.toml when rendering after add/update
+    if source_project is not None:
+        src_config_path = find_config(source_project)
+        if src_config_path is not None:
+            src_config = load_config(src_config_path)
+            if target_name in src_config.targets:
+                cfg = src_config.targets[target_name]
+                if cfg.model_map:
+                    return cfg
+
     config_path = find_config(project)
     if config_path is not None:
         project_config = load_config(config_path)
@@ -52,7 +110,6 @@ def _resolve_target_config(
             if cfg.model_map:
                 return cfg
 
-    # 2. Adapter has defaults → use them
     if adapter.default_model_map:
         return TargetConfig(
             name=target_name,
@@ -61,20 +118,9 @@ def _resolve_target_config(
             model_map=adapter.default_model_map,
         )
 
-    # 3. No defaults, no config → prompt user
-    if interactive:
-        logger.info(f"\nNo model config found for '{target_name}'. Please specify:")
-        reasoning = typer.prompt("  reasoning model")
-        coding = typer.prompt("  coding model")
-        return TargetConfig(
-            name=target_name,
-            enabled=True,
-            output_dir=".",
-            model_map={"reasoning": reasoning, "coding": coding},
-        )
-
-    logger.error(
-        f"No model_map for '{target_name}'. Add [targets.{target_name}.model_map] to roles.toml."
+    _error(
+        f"No model_map for '{target_name}'. Add [targets.{target_name}.model_map] to roles.toml "
+        f"(in the source repo or current project)."
     )
     raise typer.Exit(1)
 
@@ -89,17 +135,77 @@ def _resolve_roles_dir(project: Path) -> Path:
     return resolve_roles_dir(project)
 
 
-def _load_installed_agents(project: Path):
-    from role_forge.loader import load_agents
-
-    roles_dir = _resolve_roles_dir(project)
-    if not roles_dir.is_dir():
-        logger.error("No roles found. Run 'role-forge add' first.")
-        raise typer.Exit(1)
-    return roles_dir, load_agents(roles_dir)
+def _resolve_scope(global_scope: bool) -> Scope:
+    return "user" if global_scope else "project"
 
 
-def _render_agents_to_targets(project: Path, agents, target_names: list[str]) -> None:
+def _prompt_scope(prompt: str = "Install to (p)roject or (g)lobal?") -> Scope:
+    """Interactively ask for project vs user (global) scope. Default project."""
+    raw = typer.prompt(prompt, default="p").strip().lower()
+    if raw in ("g", "global"):
+        return "user"
+    return "project"
+
+
+def _scope_label(scope: Scope) -> str:
+    return "user" if scope == "user" else "project"
+
+
+def _roles_not_found_message(scope: Scope, roles_dir: Path) -> str:
+    return f"No roles found in {_scope_label(scope)} scope: {roles_dir}"
+
+
+def _load_agents_in_scope(project: Path, scope: Scope):
+    from role_forge.loader import load_agents_in_scope
+
+    roles_dir, agents = load_agents_in_scope(project, scope=scope)
+    if agents:
+        return roles_dir, agents
+
+    _error(_roles_not_found_message(scope, roles_dir))
+    raise typer.Exit(1)
+
+
+def _load_merged_agents(project: Path):
+    from role_forge.loader import load_merged_agents
+
+    agents = load_merged_agents(project)
+    if agents:
+        return agents
+
+    _error("No roles found in project or user scope. Run 'role-forge add' first.")
+    raise typer.Exit(1)
+
+
+def _serialize_agent(agent, *, scope: Scope) -> dict[str, Any]:
+    return {
+        "name": agent.name,
+        "canonical_id": agent.canonical_id,
+        "role": agent.role,
+        "tier": agent.model.tier,
+        "temperature": agent.model.temperature,
+        "relative_path": agent.relative_path,
+        "source_path": str(agent.source_path) if agent.source_path else None,
+        "scope": scope,
+    }
+
+
+def _scan_unmanaged_files(project: Path, scope: Scope):
+    from role_forge.config import USER_ROLES_DIR
+    from role_forge.loader import find_unmanaged_files
+
+    roles_dir = USER_ROLES_DIR if scope == "user" else _resolve_roles_dir(project)
+    return roles_dir, find_unmanaged_files(roles_dir)
+
+
+def _render_agents_to_targets(
+    project: Path,
+    agents,
+    target_names: list[str],
+    *,
+    interactive: bool = True,
+    source_project: Path | None = None,
+) -> None:
     from role_forge.adapters import get_adapter
     from role_forge.topology import TopologyError
 
@@ -107,23 +213,42 @@ def _render_agents_to_targets(project: Path, agents, target_names: list[str]) ->
         try:
             adapter = get_adapter(target_name)
         except ValueError as e:
-            logger.error(str(e))
+            _error(str(e))
             continue
 
-        config = _resolve_target_config(target_name, adapter, project)
+        config = _resolve_target_config(
+            target_name, adapter, project, interactive=interactive, source_project=source_project
+        )
 
         try:
             outputs = adapter.cast(agents, config)
         except TopologyError as e:
-            logger.error(str(e))
+            _error(str(e))
             raise typer.Exit(1) from e
 
-        _write_outputs(project, outputs, config.output_dir)
-        logger.info(f"Rendered {len(outputs)} roles -> {target_name}")
+        outputs_to_write = _confirm_render_overwrite(
+            project, config.output_dir, outputs, interactive
+        )
+        if outputs_to_write:
+            _write_outputs(project, outputs_to_write, config.output_dir)
+        _success(f"Rendered {len(outputs)} roles -> {target_name}")
+
+
+def _confirm_render_overwrite(project: Path, output_dir: str, outputs, interactive: bool):
+    """If interactive and some paths exist, prompt once. Return list to write (filtered or all)."""
+    out_dir_path = project / output_dir
+    existing = [o for o in outputs if (out_dir_path / o.path).exists()]
+    if not existing or not interactive:
+        return list(outputs)
+    n = len(existing)
+    display_dir = output_dir if output_dir != "." else str(project)
+    if not typer.confirm(f"Overwrite {n} existing file(s) in {display_dir}?", default=True):
+        existing_paths = {(out_dir_path / o.path).resolve() for o in existing}
+        return [o for o in outputs if (out_dir_path / o.path).resolve() not in existing_paths]
+    return list(outputs)
 
 
 def _write_outputs(project: Path, outputs, output_dir: str) -> None:
-    """Write cast outputs beneath the configured output_dir."""
     for out in outputs:
         full_path = (project / output_dir / out.path).resolve()
         full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -131,7 +256,6 @@ def _write_outputs(project: Path, outputs, output_dir: str) -> None:
 
 
 def _resolve_remove_target(agents, ref: str):
-    """Resolve a remove reference by canonical id first, then by unique name."""
     by_id = {agent.canonical_id: agent for agent in agents}
     if ref in by_id:
         return by_id[ref]
@@ -141,11 +265,152 @@ def _resolve_remove_target(agents, ref: str):
         return matches[0]
     if len(matches) > 1:
         choices = ", ".join(agent.canonical_id for agent in matches)
-        logger.error(f"Ambiguous agent name '{ref}'. Use one of: {choices}")
+        _error(f"Ambiguous agent name '{ref}'. Use one of: {choices}")
         raise typer.Exit(1)
 
-    logger.error(f"Agent not found: {ref}")
+    _error(f"Agent not found: {ref}")
     raise typer.Exit(1)
+
+
+def _format_source_error(exc: Exception, source: str) -> str:
+    if isinstance(exc, subprocess.CalledProcessError):
+        cmd = " ".join(exc.cmd) if isinstance(exc.cmd, list) else str(exc.cmd)
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        detail = stderr or stdout or str(exc)
+        return f"Failed to fetch source '{source}'.\n  step: {cmd}\n  detail: {detail}"
+    return f"Failed to fetch source '{source}'.\n  detail: {exc}"
+
+
+def _format_roles_dir_error(source: str, repo_path: Path) -> str:
+    return (
+        f"Fetched source '{source}', but no role definitions were found.\n"
+        f"  cache: {repo_path}\n"
+        "  expected: a `roles.toml` with `project.roles_dir`, or a `roles/` directory"
+    )
+
+
+def _filter_agents_by_role(agents, role_patterns: list[str] | None):
+    """Keep agents whose name or canonical_id matches any pattern (substring, case-insensitive)."""
+    if not role_patterns:
+        return list(agents)
+    lower_patterns = [p.lower() for p in role_patterns]
+    return [
+        a
+        for a in agents
+        if any(pat in a.name.lower() or pat in a.canonical_id.lower() for pat in lower_patterns)
+    ]
+
+
+def _show_agent_table(agents) -> None:
+    _info(f"Found {len(agents)} role(s):")
+    for agent in agents:
+        logger.info(
+            _bullet(
+                agent.canonical_id,
+                f"role={agent.role}, tier={agent.model.tier}",
+            )
+        )
+
+
+def _build_install_plan(install_dir: Path, agents) -> InstallPlan:
+    new_agents = []
+    overwrite_agents = []
+    for agent in agents:
+        destination = install_dir / agent.install_relative_path()
+        if destination.exists():
+            overwrite_agents.append(agent)
+        else:
+            new_agents.append(agent)
+    return InstallPlan(
+        install_dir=install_dir, new_agents=new_agents, overwrite_agents=overwrite_agents
+    )
+
+
+def _confirm_install(plan: InstallPlan, scope: Scope, yes: bool) -> bool:
+    """Return True to include overwrites, False to install only new. Raises Exit on cancel."""
+    _info("Install plan")
+    logger.info(_bullet("target", str(plan.install_dir)))
+    logger.info(_bullet("scope", _scope_label(scope)))
+    logger.info(_bullet("new", str(len(plan.new_agents))))
+    logger.info(_bullet("overwrite", str(len(plan.overwrite_agents))))
+
+    if yes:
+        return True
+    if not plan.overwrite_agents:
+        return True
+    n = len(plan.overwrite_agents)
+    if not typer.confirm(f"Overwrite {n} existing role(s)?", default=True):
+        _warn("Skipping overwrites; only new roles will be installed.")
+        return False
+    return True
+
+
+def _copy_agents(plan: InstallPlan, yes: bool, include_overwrites: bool) -> list[Any]:
+    agents_to_copy = plan.new_agents + (plan.overwrite_agents if include_overwrites else [])
+    installed = []
+    for agent in agents_to_copy:
+        assert agent.source_path is not None
+        destination = plan.install_dir / agent.install_relative_path()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(agent.source_path, destination)
+        installed.append(agent)
+        logger.info(_bullet("installed", agent.canonical_id))
+    return installed
+
+
+def _resolve_render_targets(
+    project: Path,
+    target: list[str] | None,
+    source_default_targets: list[str] | None,
+) -> list[str]:
+    """Resolve render targets in priority order:
+
+    1. Explicit --target
+    2. Targets from the source repo's roles.toml (if any)
+    3. Fallback: current project roles.toml / auto-detected platforms
+    """
+    from role_forge.platform import resolve_targets
+
+    if target:
+        return list(target)
+    if source_default_targets:
+        return list(source_default_targets)
+    return resolve_targets(project)
+
+
+def _render_after_add(
+    project: Path,
+    target: list[str] | None,
+    source_default_targets: list[str] | None,
+    interactive: bool,
+    no_render: bool,
+    source_project: Path | None = None,
+    global_install: bool = False,
+) -> None:
+    """Render after add/update; toml default. Use --no-render to skip or confirm if interactive."""
+    if no_render:
+        return
+    default_targets = _resolve_render_targets(project, target, source_default_targets)
+    if not default_targets:
+        _info("Installed canonical roles. No render target detected in this project.")
+        return
+    if interactive and not typer.confirm(
+        f"Render to {', '.join(default_targets)}?",
+        default=True,
+    ):
+        _info("Skipped rendering. Run 'role-forge render' when needed.")
+        return
+    # Global install: render into home so ~/.opencode/agents etc. are populated
+    render_root = Path.home() if global_install else project
+    agents = _load_merged_agents(render_root)
+    _render_agents_to_targets(
+        render_root,
+        agents,
+        default_targets,
+        interactive=interactive,
+        source_project=source_project,
+    )
 
 
 @app.command()
@@ -156,133 +421,173 @@ def add(
         bool, typer.Option("--global", "-g", help="Install to ~/.agents/roles/")
     ] = False,
     target: Annotated[
-        list[str] | None, typer.Option("--target", "-t", help="Cast target platform(s)")
+        list[str] | None,
+        typer.Option("--target", "-t", help="Render to these targets (default: toml or auto)"),
+    ] = None,
+    no_render: Annotated[
+        bool,
+        typer.Option("--no-render", help="Skip render after install"),
+    ] = False,
+    role: Annotated[
+        list[str] | None,
+        typer.Option("--role", "-r", help="Install only roles matching (substring of name/id)"),
     ] = None,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Add agent definitions from a source."""
+    """Add agent definitions from a source. Renders to targets by default (toml or -t)."""
+    from role_forge.config import USER_ROLES_DIR, find_config, load_config
     from role_forge.loader import load_agents
-    from role_forge.platform import resolve_targets
     from role_forge.registry import fetch_source, find_roles_dir, parse_source
     from role_forge.topology import TopologyError, validate_agents
 
-    del yes
-
     parsed = parse_source(source)
-
     try:
         repo_path = fetch_source(parsed)
     except Exception as e:
-        logger.error(f"Error fetching source: {e}")
+        _error(_format_source_error(e, source))
         raise typer.Exit(1) from e
 
     try:
         roles_dir = find_roles_dir(repo_path)
     except FileNotFoundError as e:
-        logger.error(str(e))
+        _error(_format_roles_dir_error(source, repo_path))
         raise typer.Exit(1) from e
+
+    # Resolve default targets from the source repo's roles.toml (if present)
+    source_default_targets: list[str] | None = None
+    config_path = find_config(repo_path)
+    if config_path is not None:
+        project_config = load_config(config_path)
+        enabled_targets = [name for name, cfg in project_config.targets.items() if cfg.enabled]
+        if enabled_targets:
+            source_default_targets = enabled_targets
 
     agents = load_agents(roles_dir)
     if not agents:
-        logger.error("No agent definitions found in source.")
+        _error("No role definitions found in source.")
         raise typer.Exit(1)
+
     try:
         validate_agents(agents)
     except TopologyError as e:
-        logger.error(str(e))
+        _error(str(e))
         raise typer.Exit(1) from e
 
-    logger.info(f"Found {len(agents)} agents:")
-    for a in agents:
-        logger.info(f"  {a.canonical_id:<25} {a.role:<10} {a.model.tier}")
+    agents = _filter_agents_by_role(agents, role)
+    if not agents:
+        _error("No roles match the given --role filter.")
+        raise typer.Exit(1)
 
-    # Determine install target
-    if global_install:
-        install_dir = Path.home() / ".agents" / "roles"
-    else:
-        project = _resolve_project(project_dir)
-        install_dir = _resolve_roles_dir(project)
-
-    install_dir.mkdir(parents=True, exist_ok=True)
-
-    # Copy agent files
-    for a in agents:
-        if a.source_path:
-            dest = install_dir / a.install_relative_path()
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(a.source_path, dest)
-            logger.info(f"  Installed {a.canonical_id}")
-
-    logger.info(f"\nInstalled {len(agents)} agents to {install_dir}")
-
-    # Auto-cast
-    if global_install and not target:
-        return
+    _show_agent_table(agents)
 
     project = _resolve_project(project_dir)
+    if yes:
+        scope = _resolve_scope(global_install)
+    elif global_install:
+        scope = "user"
+    else:
+        scope = _prompt_scope()
+        global_install = scope == "user"
+    install_dir = USER_ROLES_DIR if global_install else _resolve_roles_dir(project)
+    install_dir.mkdir(parents=True, exist_ok=True)
 
-    cast_targets = list(target) if target else resolve_targets(project)
+    plan = _build_install_plan(install_dir, agents)
+    include_overwrites = _confirm_install(plan, scope, yes)
+    if not include_overwrites and not plan.new_agents:
+        _warn("Install cancelled.")
+        raise typer.Exit(1)
+    installed_agents = _copy_agents(plan, yes, include_overwrites)
 
-    if not cast_targets:
+    if not installed_agents:
+        _warn("No roles were installed.")
         return
 
-    installed_agents = load_agents(install_dir)
-    for target_name in cast_targets:
-        _render_agents_to_targets(project, installed_agents, [target_name])
+    _success(f"Installed {len(installed_agents)} role(s)")
+    logger.info(_bullet("location", str(install_dir)))
+    _render_after_add(
+        project,
+        target,
+        source_default_targets,
+        interactive=not yes,
+        no_render=no_render,
+        source_project=repo_path,
+        global_install=global_install,
+    )
 
 
 @app.command("list")
 def list_agents(
+    global_install: Annotated[
+        bool, typer.Option("--global", "-g", help="List roles from ~/.agents/roles/")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output roles as JSON")] = False,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """List all installed agent definitions."""
-    project = _resolve_project(project_dir)
-    _, agents = _load_installed_agents(project)
+    """List installed agent definitions for one scope."""
+    from role_forge.loader import load_agents_in_scope
 
-    logger.info(f"{'AGENT':<25} {'ID':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
-    logger.info("-" * 82)
+    project = _resolve_project(project_dir)
+    scope = _resolve_scope(global_install)
+    roles_dir, agents = load_agents_in_scope(project, scope=scope)
+
+    if json_output:
+        typer.echo(json.dumps([_serialize_agent(agent, scope=scope) for agent in agents], indent=2))
+        return
+
+    if not agents:
+        _error(_roles_not_found_message(scope, roles_dir))
+        raise typer.Exit(1)
+
+    _info(f"Roles in {_scope_label(scope)} scope")
+    typer.echo(_dim(f"  {roles_dir}"))
+    typer.echo(f"{'AGENT':<25} {'ID':<25} {'ROLE':<10} {'TIER':<12} {'TEMP':<6}")
+    typer.echo(_dim("-" * 82))
     for agent in agents:
         temp = str(agent.model.temperature) if agent.model.temperature is not None else "-"
-        logger.info(
+        typer.echo(
             f"{agent.name:<25} {agent.canonical_id:<25} {agent.role:<10} "
             f"{agent.model.tier:<12} {temp:<6}"
         )
 
-    logger.info(f"\n{len(agents)} roles found")
+    _success(f"{len(agents)} role(s) found in {_scope_label(scope)} scope")
 
 
 def _render_command(
-    target: Annotated[
-        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
-    ] = None,
-    project_dir: Annotated[
-        str | None, typer.Option("--project-dir", help="Project root directory")
-    ] = None,
+    target: list[str] | None,
+    project_dir: str | None,
+    role: list[str] | None = None,
+    yes: bool = False,
 ) -> None:
-    """Render installed role definitions to platform-specific configs."""
+    """Render installed roles to platform configs; optional --role filter (per-role)."""
     from role_forge.platform import resolve_targets
     from role_forge.topology import TopologyError, validate_agents
 
     project = _resolve_project(project_dir)
-    _, agents = _load_installed_agents(project)
+    agents = _load_merged_agents(project)
+    agents = _filter_agents_by_role(agents, role)
+    if not agents:
+        _error("No roles to render (empty or no match for --role).")
+        raise typer.Exit(1)
     try:
         validate_agents(agents)
     except TopologyError as e:
-        logger.error(str(e))
+        _error(str(e))
         raise typer.Exit(1) from e
-    cast_targets = list(target) if target else resolve_targets(project)
 
+    cast_targets = list(target) if target else resolve_targets(project)
     if not cast_targets:
-        logger.error(
-            f"No platforms detected. Use --target to specify one of: {', '.join(list_adapters())}"
+        _error(
+            "No render targets detected in this project.\n"
+            f"  available: {', '.join(list_adapters())}\n"
+            "  next step: rerun with `--target <name>`"
         )
         raise typer.Exit(1)
 
-    _render_agents_to_targets(project, agents, cast_targets)
+    _render_agents_to_targets(project, agents, cast_targets, interactive=not yes)
 
 
 @app.command()
@@ -290,64 +595,166 @@ def render(
     target: Annotated[
         list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
     ] = None,
+    role: Annotated[
+        list[str] | None,
+        typer.Option("--role", "-r", help="Render only roles matching (substring of name/id)"),
+    ] = None,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Skip overwrite prompt for output files")
+    ] = False,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Render installed role definitions to platform-specific configs."""
-    _render_command(target=target, project_dir=project_dir)
-
-
-@app.command()
-def cast(
-    target: Annotated[
-        list[str] | None, typer.Option("--target", "-t", help="Target platform(s)")
-    ] = None,
-    project_dir: Annotated[
-        str | None, typer.Option("--project-dir", help="Project root directory")
-    ] = None,
-) -> None:
-    """Legacy alias for `render`."""
-    _render_command(target=target, project_dir=project_dir)
+    """Render installed role definitions to platform configs (optionally filter by --role)."""
+    _render_command(target=target, project_dir=project_dir, role=role, yes=yes)
 
 
 @app.command()
 def remove(
     agent_name: Annotated[str, typer.Argument(help="Agent canonical id or unique name to remove")],
+    global_install: Annotated[
+        bool, typer.Option("--global", "-g", help="Remove from ~/.agents/roles/")
+    ] = False,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Remove an installed agent definition."""
+    """Remove an installed agent definition from one scope."""
     project = _resolve_project(project_dir)
-    roles_dir, agents = _load_installed_agents(project)
+    roles_dir, agents = _load_agents_in_scope(project, _resolve_scope(global_install))
     agent = _resolve_remove_target(agents, agent_name)
-    agent_file = roles_dir / agent.install_relative_path()
+    agent_file = agent.source_path or roles_dir / agent.install_relative_path()
     agent_file.unlink()
-    logger.info(f"Removed {agent.canonical_id}")
-    logger.info(
-        "Note: platform-specific files may still exist. Run 'role-forge render' to regenerate."
-    )
+    _success(f"Removed {agent.canonical_id}")
+    _info("If target files still reference it, run `role-forge render` to regenerate outputs.")
+
+
+@app.command()
+def doctor(
+    global_install: Annotated[
+        bool, typer.Option("--global", "-g", help="Inspect ~/.agents/roles/")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output findings as JSON")] = False,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Inspect unmanaged files under the selected roles directory."""
+    project = _resolve_project(project_dir)
+    scope = _resolve_scope(global_install)
+    roles_dir, issues = _scan_unmanaged_files(project, scope)
+
+    payload = {
+        "scope": scope,
+        "roles_dir": str(roles_dir),
+        "issue_count": len(issues),
+        "issues": [
+            {
+                "path": str(issue.path),
+                "relative_path": issue.path.relative_to(roles_dir).as_posix(),
+                "reason": issue.reason,
+            }
+            for issue in issues
+        ],
+    }
+
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    if not issues:
+        _success(f"No unmanaged files found in {_scope_label(scope)} scope")
+        typer.echo(_dim(f"  {roles_dir}"))
+        return
+
+    _warn(f"Found {len(issues)} unmanaged file(s) in {_scope_label(scope)} scope")
+    typer.echo(_dim(f"  {roles_dir}"))
+    for issue in issues:
+        relative_path = issue.path.relative_to(roles_dir).as_posix()
+        typer.echo(_bullet(relative_path, issue.reason))
+
+
+@app.command()
+def clean(
+    global_install: Annotated[
+        bool, typer.Option("--global", "-g", help="Clean ~/.agents/roles/")
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show unmanaged files without deleting")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+    project_dir: Annotated[
+        str | None, typer.Option("--project-dir", help="Project root directory")
+    ] = None,
+) -> None:
+    """Delete unmanaged files under the selected roles directory."""
+    project = _resolve_project(project_dir)
+    scope = _resolve_scope(global_install)
+    roles_dir, issues = _scan_unmanaged_files(project, scope)
+
+    if not issues:
+        _success(f"No unmanaged files found in {_scope_label(scope)} scope")
+        typer.echo(_dim(f"  {roles_dir}"))
+        return
+
+    heading = "Would remove" if dry_run else "Removing"
+    _warn(f"{heading} {len(issues)} unmanaged file(s) from {_scope_label(scope)} scope")
+    typer.echo(_dim(f"  {roles_dir}"))
+    for issue in issues:
+        relative_path = issue.path.relative_to(roles_dir).as_posix()
+        typer.echo(_bullet(relative_path, issue.reason))
+
+    if dry_run:
+        return
+
+    if not yes and not typer.confirm(f"Remove {len(issues)} unmanaged file(s)?", default=False):
+        _warn("Clean cancelled.")
+        raise typer.Exit(1)
+
+    for issue in issues:
+        issue.path.unlink()
+
+    _success(f"Removed {len(issues)} unmanaged file(s)")
 
 
 @app.command()
 def update(
     source: Annotated[str, typer.Argument(help="Source to update: org/repo")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip all prompts")] = False,
+    global_install: Annotated[
+        bool, typer.Option("--global", "-g", help="Update ~/.agents/roles/")
+    ] = False,
     target: Annotated[
-        list[str] | None, typer.Option("--target", "-t", help="Cast target platform(s)")
+        list[str] | None,
+        typer.Option("--target", "-t", help="Render to these targets (default: toml or auto)"),
+    ] = None,
+    no_render: Annotated[
+        bool,
+        typer.Option("--no-render", help="Skip render after update"),
+    ] = False,
+    role: Annotated[
+        list[str] | None,
+        typer.Option("--role", "-r", help="Update only roles matching (substring of name/id)"),
     ] = None,
     project_dir: Annotated[
         str | None, typer.Option("--project-dir", help="Project root directory")
     ] = None,
 ) -> None:
-    """Update agent definitions from a previously added source."""
+    """Update from a previously added source. Renders to targets by default (toml or -t)."""
     from role_forge.registry import parse_source
 
     parsed = parse_source(source)
     if parsed.is_local:
-        logger.error("Cannot update a local source. Use 'add' instead.")
+        _error("Cannot update a local source. Use 'add' instead.")
         raise typer.Exit(1)
 
-    # Re-use add logic — fetch_source will git pull if cached
-    add(source=source, yes=yes, global_install=False, target=target, project_dir=project_dir)
+    add(
+        source=source,
+        yes=yes,
+        global_install=global_install,
+        target=target,
+        no_render=no_render,
+        role=role,
+        project_dir=project_dir,
+    )

@@ -1,6 +1,6 @@
 # Development
 
-`role-forge` keeps user-facing reference docs in `docs/` and design history in `docs/plans/`.
+`role-forge` keeps user-facing reference docs and architecture in `docs/`.
 
 Formal architecture and system documentation lives in `docs/architecture/`.
 

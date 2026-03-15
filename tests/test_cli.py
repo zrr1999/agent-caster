@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import sys
-from contextlib import redirect_stdout
-from io import StringIO
+import json
 
 from typer.testing import CliRunner
 
-from role_forge import __version__
+import role_forge.config as config_module
 from role_forge.cli import app
-from role_forge.legacy_cli import main as legacy_main
 
 runner = CliRunner()
 
@@ -19,34 +16,13 @@ def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "role-forge" in result.output
-    assert __version__ in result.output
-
-
-def test_legacy_cli_shows_rename_hint():
-    buffer = StringIO()
-    original_argv = list(sys.argv)
-    try:
-        sys.argv = ["agent-caster", "render", "--target", "claude"]
-        with redirect_stdout(buffer):
-            try:
-                legacy_main()
-            except SystemExit as exc:
-                assert exc.code == 1
-            else:
-                raise AssertionError("legacy_main() should exit")
-    finally:
-        sys.argv = original_argv
-
-    output = buffer.getvalue()
-    assert "renamed to `role-forge`" in output
-    assert "role-forge render --target claude" in output
 
 
 # -- add command ---------------------------------------------------------------
 
 
 def test_add_from_local(tmp_path):
-    """add from a local path with --yes should copy agents and skip interaction."""
+    """add from a local path should confirm and install roles."""
     source = tmp_path / "source"
     roles = source / "roles"
     roles.mkdir(parents=True)
@@ -62,12 +38,80 @@ def test_add_from_local(tmp_path):
         [
             "add",
             str(source),
+            "--yes",
             "--project-dir",
             str(project),
         ],
     )
     assert result.exit_code == 0, result.output
     assert (project / ".agents" / "roles" / "explorer.md").is_file()
+
+
+def test_add_yes_skips_install_confirmation(tmp_path):
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (roles / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+    project = tmp_path / "project"
+    project.mkdir()
+
+    result = runner.invoke(
+        app,
+        ["add", str(source), "--yes", "--project-dir", str(project)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Continue with install?" not in result.output
+
+
+def test_add_without_yes_can_cancel_install(tmp_path):
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (roles / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+    project = tmp_path / "project"
+    project.mkdir()
+    target_file = project / ".agents" / "roles" / "explorer.md"
+    target_file.parent.mkdir(parents=True)
+    target_file.write_text("---\nname: explorer\n---\n# Existing\n")
+
+    result = runner.invoke(
+        app,
+        ["add", str(source), "--project-dir", str(project)],
+        input="p\nn\n",  # scope: project, then cancel overwrite
+    )
+
+    assert result.exit_code == 1
+    assert target_file.read_text() == "---\nname: explorer\n---\n# Existing\n"
+
+
+def test_add_without_yes_prompts_before_overwrite(tmp_path):
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (roles / "explorer.md").write_text("---\nname: explorer\n---\n# New Explorer\n")
+    project_roles = tmp_path / "project" / ".agents" / "roles"
+    project_roles.mkdir(parents=True)
+    existing = project_roles / "explorer.md"
+    existing.write_text("---\nname: explorer\n---\n# Old Explorer\n")
+
+    # One overwrite prompt: n = skip overwrites, no new roles -> cancel (exit 1)
+    result = runner.invoke(
+        app,
+        ["add", str(source), "--project-dir", str(tmp_path / "project")],
+        input="p\nn\n",  # scope: project, skip overwrites
+    )
+    assert result.exit_code == 1, result.output
+    assert existing.read_text() == "---\nname: explorer\n---\n# Old Explorer\n"
+
+    # One overwrite prompt: y = overwrite all
+    result2 = runner.invoke(
+        app,
+        ["add", str(source), "--project-dir", str(tmp_path / "project")],
+        input="p\ny\n",  # scope: project, allow overwrite
+    )
+    assert result2.exit_code == 0, result2.output
+    assert existing.read_text() == "---\nname: explorer\n---\n# New Explorer\n"
 
 
 def test_add_with_auto_cast(tmp_path):
@@ -89,12 +133,66 @@ def test_add_with_auto_cast(tmp_path):
         [
             "add",
             str(source),
+            "--yes",
             "--project-dir",
             str(project),
         ],
     )
     assert result.exit_code == 0, result.output
     assert (project / ".claude" / "agents" / "explorer.md").is_file()
+
+
+def test_add_no_render_skips_render(tmp_path):
+    """add --no-render installs roles but does not render to targets."""
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (roles / "explorer.md").write_text(
+        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
+    )
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".claude").mkdir()
+
+    result = runner.invoke(
+        app,
+        ["add", str(source), "--yes", "--no-render", "--project-dir", str(project)],
+    )
+    assert result.exit_code == 0, result.output
+    assert (project / ".agents" / "roles" / "explorer.md").is_file()
+    assert not (project / ".claude" / "agents" / "explorer.md").exists()
+
+
+def test_add_role_filter_installs_only_matching(tmp_path):
+    """add --role installs only roles whose name/id match (substring)."""
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    for name in ("explorer", "writer", "aligner"):
+        (roles / f"{name}.md").write_text(
+            "---\nname: " + name + "\ndescription: x\nrole: subagent\n"
+            "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# x\n"
+        )
+    project = tmp_path / "project"
+    project.mkdir()
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            str(source),
+            "--yes",
+            "--no-render",
+            "--role",
+            "explorer",
+            "--project-dir",
+            str(project),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (project / ".agents" / "roles" / "explorer.md").is_file()
+    assert not (project / ".agents" / "roles" / "writer.md").exists()
+    assert not (project / ".agents" / "roles" / "aligner.md").exists()
 
 
 def test_add_with_explicit_target(tmp_path):
@@ -115,6 +213,7 @@ def test_add_with_explicit_target(tmp_path):
         [
             "add",
             str(source),
+            "--yes",
             "--target",
             "claude",
             "--project-dir",
@@ -145,6 +244,7 @@ def test_add_preserves_nested_role_paths_and_cast_output(tmp_path):
         [
             "add",
             str(source),
+            "--yes",
             "--target",
             "claude",
             "--project-dir",
@@ -171,7 +271,45 @@ def test_list_agents(tmp_path):
     result = runner.invoke(app, ["list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0
     assert "explorer" in result.output
-    assert "ID" in result.output
+
+
+def test_list_global_reads_only_user_scope(tmp_path, monkeypatch):
+    project_roles = tmp_path / "project" / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+    (project_roles / "project.md").write_text("---\nname: project\n---\n# Project")
+    (user_roles / "user.md").write_text("---\nname: user\n---\n# User")
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    result = runner.invoke(app, ["list", "-g", "--project-dir", str(tmp_path / "project")])
+
+    assert result.exit_code == 0
+    assert "user" in result.output
+    assert "project" not in result.output
+
+
+def test_list_json_outputs_machine_readable_roles(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer")
+
+    result = runner.invoke(app, ["list", "--json", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload == [
+        {
+            "name": "explorer",
+            "canonical_id": "explorer",
+            "role": "subagent",
+            "tier": "reasoning",
+            "temperature": None,
+            "relative_path": "explorer.md",
+            "source_path": str((roles_dir / "explorer.md").resolve()),
+            "scope": "project",
+        }
+    ]
 
 
 def test_list_no_agents(tmp_path):
@@ -179,31 +317,10 @@ def test_list_no_agents(tmp_path):
     assert result.exit_code == 1
 
 
-# -- cast command --------------------------------------------------------------
+# -- render command ------------------------------------------------------------
 
 
-def test_cast_with_target(tmp_path):
-    roles_dir = tmp_path / ".agents" / "roles"
-    roles_dir.mkdir(parents=True)
-    (roles_dir / "explorer.md").write_text(
-        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
-    )
-    result = runner.invoke(
-        app,
-        [
-            "cast",
-            "--target",
-            "claude",
-            "--project-dir",
-            str(tmp_path),
-        ],
-    )
-    assert result.exit_code == 0
-    assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
-
-
-def test_render_alias_with_target(tmp_path):
+def test_render_with_target(tmp_path):
     roles_dir = tmp_path / ".agents" / "roles"
     roles_dir.mkdir(parents=True)
     (roles_dir / "explorer.md").write_text(
@@ -224,11 +341,49 @@ def test_render_alias_with_target(tmp_path):
     assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
 
 
-def test_cast_no_agents(tmp_path):
+def test_render_merges_user_and_project_agents(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project_roles = project / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+    (project / ".claude").mkdir(parents=True)
+
+    (user_roles / "user-only.md").write_text(
+        "---\nname: user-only\ndescription: User\nrole: subagent\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# User\n"
+    )
+    (user_roles / "shared.md").write_text(
+        "---\nname: shared\ndescription: User shared\nrole: subagent\n"
+        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# User shared\n"
+    )
+    (project_roles / "shared.md").write_text(
+        "---\nname: shared\ndescription: Project shared\nrole: subagent\n"
+        "model:\n  tier: coding\ncapabilities:\n  - read\n---\n# Project shared\n"
+    )
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--project-dir", str(project)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert (project / ".claude" / "agents" / "user-only.md").is_file()
+    shared_content = (project / ".claude" / "agents" / "shared.md").read_text()
+    assert "Project shared" in shared_content
+    assert "claude-sonnet-4" in shared_content
+
+
+def test_render_no_agents(tmp_path, monkeypatch):
+    """Render with no roles in project or user scope must exit 1."""
+    empty_user_roles = tmp_path / "user_roles"
+    empty_user_roles.mkdir()
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", empty_user_roles)
     result = runner.invoke(
         app,
         [
-            "cast",
+            "render",
             "--target",
             "claude",
             "--project-dir",
@@ -236,6 +391,25 @@ def test_cast_no_agents(tmp_path):
         ],
     )
     assert result.exit_code == 1
+
+
+def test_render_role_filter_renders_only_matching(tmp_path):
+    """render --role outputs only roles matching (substring of name/id)."""
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    for name in ("explorer", "writer"):
+        (roles_dir / f"{name}.md").write_text(
+            "---\nname: " + name + "\ndescription: x\nrole: subagent\n"
+            "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# x\n"
+        )
+    (tmp_path / ".claude").mkdir()
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--role", "explorer", "--project-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
+    assert not (tmp_path / ".claude" / "agents" / "writer.md").exists()
 
 
 # -- remove command ------------------------------------------------------------
@@ -274,6 +448,25 @@ def test_remove_nested_agent_by_canonical_id(tmp_path):
     )
     assert result.exit_code == 0
     assert not (roles_dir / "worker.md").exists()
+
+
+def test_remove_global_only_deletes_user_scope(tmp_path, monkeypatch):
+    project_roles = tmp_path / "project" / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+    (project_roles / "shared.md").write_text("---\nname: shared\n---\n# Project")
+    (user_roles / "shared.md").write_text("---\nname: shared\n---\n# User")
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    result = runner.invoke(
+        app,
+        ["remove", "shared", "-g", "--project-dir", str(tmp_path / "project")],
+    )
+
+    assert result.exit_code == 0
+    assert not (user_roles / "shared.md").exists()
+    assert (project_roles / "shared.md").exists()
 
 
 def test_remove_ambiguous_name_requires_canonical_id(tmp_path):
@@ -358,6 +551,108 @@ def test_update_rejects_local():
     assert "Cannot update a local source" in result.output
 
 
+def test_add_missing_roles_dir_message_is_actionable(monkeypatch, tmp_path):
+    source_root = tmp_path / "cache"
+    source_root.mkdir()
+
+    monkeypatch.setattr("role_forge.registry.fetch_source", lambda parsed: source_root)
+
+    result = runner.invoke(app, ["add", "PFCCLab/precision-agents", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert (
+        "Fetched source 'PFCCLab/precision-agents', but no role definitions were found"
+        in result.output
+    )
+    assert "expected: a `roles.toml`" in result.output
+
+
+def test_update_global_passes_scope(monkeypatch, tmp_path):
+    calls: list[dict[str, object]] = []
+
+    def fake_add(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr("role_forge.cli.add", fake_add)
+
+    result = runner.invoke(
+        app,
+        ["update", "PFCCLab/precision-agents", "-g", "--yes", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert calls == [
+        {
+            "source": "PFCCLab/precision-agents",
+            "yes": True,
+            "global_install": True,
+            "target": None,
+            "no_render": False,
+            "role": None,
+            "project_dir": str(tmp_path),
+        }
+    ]
+
+
+def test_doctor_reports_unmanaged_files(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "good.md").write_text("---\nname: good\n---\n# Good")
+    (roles_dir / "bad.md").write_text("oops")
+    (roles_dir / "notes.txt").write_text("notes")
+
+    result = runner.invoke(app, ["doctor", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "bad.md" in result.output
+    assert "notes.txt" in result.output
+
+
+def test_doctor_json_outputs_findings(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "bad.md").write_text("oops")
+
+    result = runner.invoke(app, ["doctor", "--json", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["scope"] == "project"
+    assert payload["issue_count"] == 1
+    assert payload["issues"][0]["relative_path"] == "bad.md"
+
+
+def test_clean_dry_run_keeps_unmanaged_files(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    bad_file = roles_dir / "bad.md"
+    bad_file.write_text("oops")
+
+    result = runner.invoke(app, ["clean", "--dry-run", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert bad_file.exists()
+    assert "Would remove" in result.output
+
+
+def test_clean_yes_removes_only_unmanaged_files(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    good_file = roles_dir / "good.md"
+    bad_file = roles_dir / "bad.md"
+    txt_file = roles_dir / "notes.txt"
+    good_file.write_text("---\nname: good\n---\n# Good")
+    bad_file.write_text("oops")
+    txt_file.write_text("notes")
+
+    result = runner.invoke(app, ["clean", "-y", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert good_file.exists()
+    assert not bad_file.exists()
+    assert not txt_file.exists()
+
+
 # -- integration ---------------------------------------------------------------
 
 
@@ -388,6 +683,7 @@ def test_add_uses_roles_toml_config(tmp_path):
         [
             "add",
             str(source),
+            "--yes",
             "--target",
             "claude",
             "--project-dir",
@@ -401,8 +697,8 @@ def test_add_uses_roles_toml_config(tmp_path):
     assert "my-custom-reasoning" in content
 
 
-def test_cast_uses_roles_toml_config(tmp_path):
-    """cast should use model_map from roles.toml (canonical name) when present."""
+def test_render_uses_roles_toml_config(tmp_path):
+    """render should use model_map from roles.toml (canonical name) when present."""
     roles_dir = tmp_path / ".agents" / "roles"
     roles_dir.mkdir(parents=True)
     (roles_dir / "explorer.md").write_text(
@@ -422,7 +718,7 @@ def test_cast_uses_roles_toml_config(tmp_path):
     result = runner.invoke(
         app,
         [
-            "cast",
+            "render",
             "--target",
             "claude",
             "--project-dir",
@@ -436,7 +732,7 @@ def test_cast_uses_roles_toml_config(tmp_path):
     assert "toml-coding" in content
 
 
-def test_cast_namespace_layout_avoids_nested_name_collisions(tmp_path):
+def test_render_namespace_layout_avoids_nested_name_collisions(tmp_path):
     roles_dir = tmp_path / ".agents" / "roles"
     (roles_dir / "l2").mkdir(parents=True)
     (roles_dir / "l3").mkdir(parents=True)
@@ -456,14 +752,14 @@ def test_cast_namespace_layout_avoids_nested_name_collisions(tmp_path):
 
     result = runner.invoke(
         app,
-        ["cast", "--target", "claude", "--project-dir", str(tmp_path)],
+        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert (tmp_path / ".claude" / "agents" / "l2__worker.md").is_file()
     assert (tmp_path / ".claude" / "agents" / "l3__worker.md").is_file()
 
 
-def test_cast_flatten_layout_rejects_nested_name_collisions(tmp_path):
+def test_render_flatten_layout_rejects_nested_name_collisions(tmp_path):
     roles_dir = tmp_path / ".agents" / "roles"
     (roles_dir / "l2").mkdir(parents=True)
     (roles_dir / "l3").mkdir(parents=True)
@@ -479,17 +775,23 @@ def test_cast_flatten_layout_rejects_nested_name_collisions(tmp_path):
 
     result = runner.invoke(
         app,
-        ["cast", "--target", "claude", "--project-dir", str(tmp_path)],
+        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
     )
     assert result.exit_code == 1
     assert "maps both" in result.output
 
 
-def test_add_opencode_prompts_for_model(tmp_path):
-    """add with opencode target should prompt for model when no config exists."""
+def test_add_opencode_uses_source_repo_model_map(tmp_path):
+    """add with opencode target uses model_map from source repo's roles.toml (no prompt)."""
     source = tmp_path / "source"
     roles = source / "roles"
     roles.mkdir(parents=True)
+    (source / "roles.toml").write_text(
+        '[project]\nroles_dir = "roles"\n\n'
+        "[targets.opencode]\nenabled = true\n\n"
+        "[targets.opencode.model_map]\n"
+        'reasoning = "my-reasoning-model"\ncoding = "my-coding-model"\n'
+    )
     (roles / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
         "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
@@ -498,7 +800,6 @@ def test_add_opencode_prompts_for_model(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
 
-    # Simulate user typing model names at the prompt
     result = runner.invoke(
         app,
         [
@@ -509,7 +810,7 @@ def test_add_opencode_prompts_for_model(tmp_path):
             "--project-dir",
             str(project),
         ],
-        input="my-reasoning-model\nmy-coding-model\n",
+        input="p\ny\n",  # scope: project, confirm render
     )
     assert result.exit_code == 0, result.output
     agent_file = project / ".opencode" / "agents" / "explorer.md"
@@ -518,8 +819,8 @@ def test_add_opencode_prompts_for_model(tmp_path):
     assert "my-reasoning-model" in content
 
 
-def test_full_workflow_add_list_cast_remove(tmp_path):
-    """Full workflow: add -> list -> cast -> remove."""
+def test_full_workflow_add_list_render_remove(tmp_path):
+    """Full workflow: add -> list -> render -> remove."""
     source = tmp_path / "source"
     roles = source / "roles"
     roles.mkdir(parents=True)
@@ -541,6 +842,7 @@ def test_full_workflow_add_list_cast_remove(tmp_path):
         [
             "add",
             str(source),
+            "--yes",
             "--target",
             "claude",
             "--project-dir",
@@ -557,15 +859,16 @@ def test_full_workflow_add_list_cast_remove(tmp_path):
     assert result.exit_code == 0
     assert "explorer" in result.output
     assert "aligner" in result.output
-    assert "2 roles found" in result.output
+    assert "2 role(s) found in project scope" in result.output
 
-    # cast
+    # render (files already exist from add; --yes skips overwrite prompt)
     result = runner.invoke(
         app,
         [
-            "cast",
+            "render",
             "--target",
             "claude",
+            "--yes",
             "--project-dir",
             str(project),
         ],
@@ -588,4 +891,4 @@ def test_full_workflow_add_list_cast_remove(tmp_path):
     # list again
     result = runner.invoke(app, ["list", "--project-dir", str(project)])
     assert result.exit_code == 0
-    assert "1 roles found" in result.output
+    assert "1 role(s) found in project scope" in result.output

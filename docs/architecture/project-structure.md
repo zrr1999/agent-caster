@@ -18,7 +18,7 @@ src/role_forge/
 ## Module responsibilities
 
 - `cli.py`: user-facing commands such as `add`, `render`, `list`, `remove`, and `update`
-- `config.py`: `roles.toml` loading, legacy compatibility, and roles directory resolution
+- `config.py`: `roles.toml` loading and roles directory resolution
 - `loader.py`: canonical role loading from Markdown plus YAML frontmatter
 - `models.py`: shared Pydantic models for roles, hierarchy, targets, and outputs
 - `groups.py`: capability-group and bash-policy definitions

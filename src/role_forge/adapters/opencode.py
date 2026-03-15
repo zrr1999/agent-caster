@@ -74,8 +74,6 @@ class OpenCodeAdapter(BaseAdapter):
         if tools.get("write"):
             perm["write"] = "allow"
 
-        if role == "primary":
-            perm["question"] = "allow"
         return perm
 
     def _serialize_frontmatter(

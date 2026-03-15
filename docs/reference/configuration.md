@@ -20,6 +20,24 @@ coding = "claude-sonnet-4"
 
 - `roles_dir`: canonical role install directory inside the project
 
+## Install scopes
+
+- project scope is the default install target and resolves from `roles.toml` or `.agents/roles`
+- user scope uses `~/.agents/roles` and is selected with `-g` or `--global`
+- render merges user and project roles by canonical id, with project roles overriding user roles
+- list and remove operate on one scope at a time: default project, `-g` for user
+
+## Local sources
+
+- local installs use `role-forge add ./path` or `role-forge add /absolute/path`
+- local sources are copied into the selected install scope; symlink installs are not supported
+
+## Hygiene commands
+
+- `doctor` reports unmanaged files in the selected roles directory
+- unmanaged files are non-`.md` files or `.md` files that fail role parsing
+- `clean` removes unmanaged files and supports `--dry-run`, `-y`, and `-g`
+
 ## Target keys
 
 - `enabled`: target toggle, default `true`
@@ -32,9 +50,8 @@ coding = "claude-sonnet-4"
 
 When reading a source repository, `role-forge` resolves role files in this order:
 
-1. `roles.toml` with `project.roles_dir` or legacy `project.agents_dir`
-2. legacy `refit.toml` with the same keys
-3. fallback `roles/`
+1. `roles.toml` with `project.roles_dir`
+2. fallback `roles/`
 
 ## Output layout modes
 

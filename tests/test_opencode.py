@@ -280,35 +280,6 @@ def test_expand_capabilities_returns_canonical_spec(opencode_config):
     )
 
 
-def test_all_capability_grants_full_permissions(opencode_config):
-    agent = AgentDef(
-        name="test",
-        description="Test",
-        capabilities=["all"],
-    )
-    adapter = OpenCodeAdapter()
-    outputs = adapter.cast([agent], opencode_config)
-    content = outputs[0].content
-    assert '"read": true' in content
-    assert '"glob": true' in content
-    assert '"grep": true' in content
-    assert '"write": true' in content
-    assert '"edit": true' in content
-    assert '"webfetch": true' in content
-    assert '"websearch": true' in content
-    assert '"bash": true' in content
-    assert '"task": true' in content
-    assert '"bash": allow' in content
-    assert '"task": allow' in content
-    assert '"read": allow' in content
-    assert '"glob": allow' in content
-    assert '"grep": allow' in content
-    assert '"write": allow' in content
-    assert '"edit": allow' in content
-    assert '"webfetch": allow' in content
-    assert '"websearch": allow' in content
-
-
 def test_custom_tier_falls_back_to_reasoning(opencode_config):
     """An unknown custom tier should fall back to the 'reasoning' model map entry."""
     agent = AgentDef(

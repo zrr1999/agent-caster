@@ -5,10 +5,12 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-from role_forge.log import logger
+from loguru import logger
+
 from role_forge.models import ProjectConfig, TargetConfig
 
 CONFIG_FILENAME = "roles.toml"
+USER_ROLES_DIR = Path.home() / ".agents" / "roles"
 
 
 class ConfigError(Exception):
@@ -24,11 +26,7 @@ def resolve_roles_dir(project: Path) -> Path:
 
 
 def find_config(project: Path) -> Path | None:
-    """Return the config file path, preferring *roles.toml* over the legacy *refit.toml*.
-
-    If *refit.toml* is found without *roles.toml*, a deprecation warning is logged and
-    the caller should prompt the user to rename the file.
-    """
+    """Return the canonical project config file path."""
     canonical = project / CONFIG_FILENAME
     if canonical.is_file():
         return canonical
@@ -36,13 +34,13 @@ def find_config(project: Path) -> Path | None:
 
 
 def load_config(config_path: Path) -> ProjectConfig:
-    """Parse roles.toml (or legacy refit.toml) and return ProjectConfig."""
+    """Parse roles.toml and return ProjectConfig."""
     logger.debug(f"Loading config from {config_path}")
     with open(config_path, "rb") as f:
         data = tomllib.load(f)
 
     project = data.get("project", {})
-    roles_dir = project.get("roles_dir") or project.get("agents_dir", ".agents/roles")
+    roles_dir = project.get("roles_dir", ".agents/roles")
 
     raw_targets = data.get("targets", {})
     targets = {}

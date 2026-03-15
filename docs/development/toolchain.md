@@ -30,4 +30,9 @@ just ci
 - tests run in GitHub Actions
 - documentation is built in CI to catch broken navigation or invalid content before merge
 
-The historical toolchain migration notes remain in `docs/plans/2026-03-02-toolchain-upgrade-design.md` for reference.
+## Conventions
+
+- **Ruff**: `from __future__ import annotations` required; isort per-file-ignores for `__init__.py` and `tests/**` (I002); PGH003 and B008 allowed where appropriate.
+- **Type checking**: `ty` checks `src/` only.
+- **Just**: `install` runs `uv sync --all-groups`; `check` runs `uvx ty check src/`.
+- **Publish**: tag-triggered workflow for PyPI.
