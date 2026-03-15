@@ -18,7 +18,7 @@ Notes:
   output file. The agent system prompt should describe what the agent is
   allowed to do instead.
 - The `alwaysApply` frontmatter key (bool) is omitted by default; add it
-  via the prompt body or a custom refit.toml override if needed.
+  via the prompt body or post-process the generated file if needed.
 """
 
 from __future__ import annotations

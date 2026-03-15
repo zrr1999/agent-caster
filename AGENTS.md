@@ -36,6 +36,15 @@ src/role_forge/
 └── adapters/       # 平台适配器和 entry point 注册
 ```
 
+## 当前 CLI 语义
+
+- 安装作用域支持 project（默认）与 user（`-g`，`~/.agents/roles`）
+- `render` 会合并 project + user roles，并以 project 同 canonical id 覆盖 user
+- `add` / `update` 默认会对覆盖操作做确认；`--yes` 跳过确认与覆盖提示
+- `roles.toml` 只支持 `project.roles_dir`，不再兼容 `project.agents_dir`
+- `list` / `remove` / `doctor` / `clean` 都按单一作用域工作：默认 project，`-g` 为 user
+- 本地路径安装继续使用 copy 语义，不支持 symlink
+
 ## 添加新适配器
 
 1. 在 `src/role_forge/adapters/` 下创建新模块，继承 `BaseAdapter`

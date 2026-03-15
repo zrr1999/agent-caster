@@ -18,7 +18,6 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-agent-caster = "role_forge.legacy_cli:main"
 role-forge = "role_forge.cli:app"
 
 [project.entry-points."role_forge.adapters"]
@@ -44,7 +43,7 @@ test = [
   "syrupy>=4.0",
 ]
 
-[tool.pytest.ini_options]
+[tool.pytest]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--tb=short"]
 

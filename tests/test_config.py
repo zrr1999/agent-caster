@@ -1,7 +1,10 @@
 """Tests for config.py."""
 
+from pathlib import Path
+
 from role_forge.config import (
     CONFIG_FILENAME,
+    USER_ROLES_DIR,
     find_config,
     load_config,
     resolve_roles_dir,
@@ -71,7 +74,7 @@ def test_target_output_layout_parsed(tmp_path):
     assert config.targets["claude"].output_layout == "namespace"
 
 
-def test_roles_dir_preferred_over_agents_dir(tmp_path):
+def test_roles_dir_ignores_agents_dir_when_both_present(tmp_path):
     config_path = tmp_path / CONFIG_FILENAME
     config_path.write_text('[project]\nroles_dir = "roles"\nagents_dir = ".agents/roles"\n')
 
@@ -79,13 +82,12 @@ def test_roles_dir_preferred_over_agents_dir(tmp_path):
     assert config.roles_dir == "roles"
 
 
-def test_agents_dir_supported_as_legacy_alias(tmp_path):
+def test_agents_dir_no_longer_supported(tmp_path):
     config_path = tmp_path / CONFIG_FILENAME
     config_path.write_text('[project]\nagents_dir = "roles"\n')
 
     config = load_config(config_path)
-    assert config.roles_dir == "roles"
-    assert config.agents_dir == "roles"
+    assert config.roles_dir == ".agents/roles"
 
 
 def test_resolve_roles_dir_defaults_when_config_absent(tmp_path):
@@ -97,3 +99,7 @@ def test_resolve_roles_dir_uses_roles_toml(tmp_path):
     config_path.write_text('[project]\nroles_dir = "roles"\n')
 
     assert resolve_roles_dir(tmp_path) == tmp_path / "roles"
+
+
+def test_user_roles_dir_constant_matches_home() -> None:
+    assert Path.home() / ".agents" / "roles" == USER_ROLES_DIR

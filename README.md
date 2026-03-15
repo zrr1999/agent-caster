@@ -14,9 +14,16 @@ uv tool install role-forge
 
 ```bash
 role-forge add PFCCLab/precision-agents -y
+role-forge add ./local-roles
 role-forge render --target claude
 role-forge list
 ```
+
+`add` and `update` ask before overwriting existing files. Use `--yes` to skip confirmations.
+
+Project installs are the default. Use `role-forge add -g`, `role-forge list -g`, and
+`role-forge remove -g` for the user scope in `~/.agents/roles`. Rendering merges both
+scopes and lets project roles override same-id user roles.
 
 ## Why this repo exists
 

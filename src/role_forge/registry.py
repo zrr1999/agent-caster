@@ -96,6 +96,7 @@ def _git_clone(url: str, dest: Path, ref: str | None) -> None:
         cmd.extend(["--branch", ref])
     cmd.extend([url, str(dest)])
     subprocess.run(cmd, check=True, capture_output=True, text=True)
+    _ensure_head_checked_out(dest, ref)
 
 
 def _git_fetch(repo_dir: Path, ref: str | None) -> None:
@@ -107,13 +108,80 @@ def _git_fetch(repo_dir: Path, ref: str | None) -> None:
         capture_output=True,
         text=True,
     )
-    target = ref or "origin/HEAD"
-    subprocess.run(
-        ["git", "checkout", target],
+    _ensure_head_checked_out(repo_dir, ref)
+
+
+def _ensure_head_checked_out(repo_dir: Path, ref: str | None) -> None:
+    """Ensure the working tree has a checked out commit after clone/fetch."""
+    if ref:
+        target = ref
+    else:
+        result = subprocess.run(
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+            cwd=repo_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        target = (
+            result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else "main"
+        )
+
+    has_refs = subprocess.run(
+        ["git", "show-ref", "--verify", f"refs/heads/{target}"],
         cwd=repo_dir,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
+    )
+    if has_refs.returncode != 0 and target == "main":
+        has_master = subprocess.run(
+            ["git", "show-ref", "--verify", "refs/heads/master"],
+            cwd=repo_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if has_master.returncode == 0:
+            target = "master"
+
+    if (
+        subprocess.run(
+            ["git", "show-ref"],
+            cwd=repo_dir,
+            check=False,
+            capture_output=True,
+            text=True,
+        ).returncode
+        != 0
+    ):
+        return
+
+    checkout_targets = [target]
+    if target == "main":
+        checkout_targets.append("master")
+
+    last_error: subprocess.CalledProcessError | None = None
+    for candidate in checkout_targets:
+        try:
+            subprocess.run(
+                ["git", "checkout", candidate],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return
+        except subprocess.CalledProcessError as exc:
+            last_error = exc
+
+    assert last_error is not None
+    raise subprocess.CalledProcessError(
+        returncode=last_error.returncode,
+        cmd=last_error.cmd,
+        output=last_error.output,
+        stderr=(last_error.stderr or "").strip()
+        or "Could not determine a usable default branch after fetching the repository.",
     )
 
 
@@ -121,9 +189,8 @@ def find_roles_dir(repo_path: Path) -> Path:
     """Find agent definitions directory in a fetched repo.
 
     Priority:
-    1. roles.toml roles_dir / agents_dir setting
-    2. refit.toml roles_dir / agents_dir setting  (legacy - deprecated)
-    3. roles/ directory
+    1. roles.toml roles_dir setting
+    2. roles/ directory
     """
     config_path = find_config(repo_path)
     if config_path is not None:
@@ -138,5 +205,5 @@ def find_roles_dir(repo_path: Path) -> Path:
 
     raise FileNotFoundError(
         f"No agent definitions found in {repo_path}. "
-        "Expected 'roles.toml' (or legacy 'refit.toml') with roles_dir, or a roles/ directory."
+        "Expected 'roles.toml' with roles_dir, or a roles/ directory."
     )

@@ -22,7 +22,7 @@ logger.add(
     _stdout_sink,
     level="INFO",
     format="{message}",
-    colorize=False,
+    colorize=True,
 )
 
 __all__ = ["logger"]

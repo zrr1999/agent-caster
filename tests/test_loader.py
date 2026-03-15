@@ -4,7 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from role_forge.loader import LoadError, _split_frontmatter, load_agents, parse_agent_file
+import role_forge.config as config_module
+from role_forge.loader import (
+    LoadError,
+    _split_frontmatter,
+    find_unmanaged_files,
+    load_agents,
+    load_agents_in_scope,
+    load_merged_agents,
+    parse_agent_file,
+)
 
 
 def test_load_agents_from_fixtures(fixtures_dir):
@@ -203,3 +212,63 @@ def test_parse_nested_fixture_with_all_capability(fixtures_dir) -> None:
     assert agent.name == "feature-lead"
     assert "all" in agent.capabilities
     assert agent.hierarchy.level == "L2"
+
+
+def test_load_agents_in_scope_project_and_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_roles = tmp_path / "project" / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+    (project_roles / "project.md").write_text("---\nname: project\n---\n# Project")
+    (user_roles / "user.md").write_text("---\nname: user\n---\n# User")
+
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    project_dir, project_agents = load_agents_in_scope(tmp_path / "project", scope="project")
+    user_dir, user_agents = load_agents_in_scope(tmp_path / "project", scope="user")
+
+    assert project_dir == project_roles
+    assert [agent.canonical_id for agent in project_agents] == ["project"]
+    assert user_dir == user_roles
+    assert [agent.canonical_id for agent in user_agents] == ["user"]
+
+
+def test_load_merged_agents_project_overrides_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    project_roles = project / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+
+    (user_roles / "shared.md").write_text("---\nname: shared\ndescription: user\n---\n# User")
+    (user_roles / "user-only.md").write_text("---\nname: user-only\n---\n# User only")
+    (project_roles / "shared.md").write_text(
+        "---\nname: shared\ndescription: project\n---\n# Project"
+    )
+    (project_roles / "project-only.md").write_text("---\nname: project-only\n---\n# Project only")
+
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    agents = load_merged_agents(project)
+
+    assert [agent.canonical_id for agent in agents] == ["project-only", "shared", "user-only"]
+    assert {agent.canonical_id: agent.description for agent in agents}["shared"] == "project"
+
+
+def test_find_unmanaged_files_reports_invalid_markdown_and_other_files(tmp_path: Path) -> None:
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir()
+    (roles_dir / "good.md").write_text("---\nname: good\n---\n# Good")
+    (roles_dir / "bad.md").write_text("not frontmatter")
+    (roles_dir / "notes.txt").write_text("oops")
+
+    issues = find_unmanaged_files(roles_dir)
+
+    assert [(issue.path.name, issue.reason) for issue in issues] == [
+        ("bad.md", "File does not start with YAML frontmatter (---)"),
+        ("notes.txt", "Non-Markdown file"),
+    ]
