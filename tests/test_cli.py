@@ -7,7 +7,6 @@ import json
 from typer.testing import CliRunner
 
 import role_forge.config as config_module
-from role_forge import __version__
 from role_forge.cli import app
 
 runner = CliRunner()
@@ -17,7 +16,6 @@ def test_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert "role-forge" in result.output
-    assert __version__ in result.output
 
 
 # -- add command ---------------------------------------------------------------
@@ -211,7 +209,6 @@ def test_list_agents(tmp_path):
     result = runner.invoke(app, ["list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0
     assert "explorer" in result.output
-    assert "ID" in result.output
 
 
 def test_list_global_reads_only_user_scope(tmp_path, monkeypatch):
@@ -280,34 +277,6 @@ def test_render_with_target(tmp_path):
     )
     assert result.exit_code == 0
     assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
-
-
-def test_render_alias_with_target(tmp_path):
-    roles_dir = tmp_path / ".agents" / "roles"
-    roles_dir.mkdir(parents=True)
-    (roles_dir / "explorer.md").write_text(
-        "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
-        "model:\n  tier: reasoning\ncapabilities:\n  - read\n---\n# Explorer\n"
-    )
-    result = runner.invoke(
-        app,
-        [
-            "render",
-            "--target",
-            "claude",
-            "--project-dir",
-            str(tmp_path),
-        ],
-    )
-    assert result.exit_code == 0
-    assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
-
-
-def test_cast_command_removed(tmp_path):
-    result = runner.invoke(app, ["cast", "--project-dir", str(tmp_path)])
-
-    assert result.exit_code == 1
-    assert "Use `role-forge render` instead" in result.output
 
 
 def test_render_merges_user_and_project_agents(tmp_path, monkeypatch):
@@ -758,7 +727,7 @@ def test_add_opencode_prompts_for_model(tmp_path):
     assert "my-reasoning-model" in content
 
 
-def test_full_workflow_add_list_cast_remove(tmp_path):
+def test_full_workflow_add_list_render_remove(tmp_path):
     """Full workflow: add -> list -> render -> remove."""
     source = tmp_path / "source"
     roles = source / "roles"

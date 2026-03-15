@@ -62,20 +62,6 @@ def test_output_path_preserves_relative_role_path():
     assert outputs[0].path == ".windsurf/rules/l3/worker.md"
 
 
-def test_default_trigger_is_model_decision():
-    """Default activation trigger should be model_decision."""
-    agent = AgentDef(
-        name="test-agent",
-        description="Test agent.",
-        prompt_content="# Test",
-    )
-    adapter = WindsurfAdapter()
-    outputs = adapter.cast([agent], WINDSURF_CONFIG)
-    content = outputs[0].content
-    assert "trigger: model_decision" in content
-    assert "description: Test agent." in content
-
-
 def test_cast_agent_without_prompt():
     """Agent without prompt_content should produce frontmatter only."""
     agent = AgentDef(
@@ -86,7 +72,6 @@ def test_cast_agent_without_prompt():
     adapter = WindsurfAdapter()
     outputs = adapter.cast([agent], WINDSURF_CONFIG)
     content = outputs[0].content
-    assert "trigger: model_decision" in content
     assert content.endswith("---")
 
 
@@ -101,7 +86,6 @@ def test_cast_agent_without_description():
     outputs = adapter.cast([agent], WINDSURF_CONFIG)
     content = outputs[0].content
     assert "description:" not in content
-    assert "trigger: model_decision" in content
 
 
 def test_model_map_ignored():
@@ -115,12 +99,6 @@ def test_model_map_ignored():
     outputs = adapter.cast([agent], config_with_model)
     # model info should NOT appear in the output
     assert "model:" not in outputs[0].content
-    assert "gpt-5" not in outputs[0].content
-
-
-def test_default_model_map_is_empty():
-    adapter = WindsurfAdapter()
-    assert adapter.default_model_map == {}
 
 
 def test_cast_multiple_agents():

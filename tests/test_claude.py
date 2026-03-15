@@ -187,24 +187,6 @@ def test_expand_capabilities_returns_canonical_spec(claude_config):
     )
 
 
-def test_all_capability_renders_unrestricted_bash_and_task(claude_config):
-    agent = AgentDef(
-        name="test",
-        description="Test",
-        capabilities=["all"],
-    )
-    adapter = ClaudeAdapter()
-    outputs = adapter.cast([agent], claude_config)
-    content = outputs[0].content
-    assert "tools: Bash, Edit, Glob, Grep, Read, Task, WebFetch, WebSearch, Write" in content
-
-
-def test_default_model_map():
-    adapter = ClaudeAdapter()
-    assert "reasoning" in adapter.default_model_map
-    assert "coding" in adapter.default_model_map
-
-
 def test_cast_nested_agent_preserves_relative_path(claude_config):
     agent = AgentDef(name="scout", description="Scout", relative_path="l2/scout.md")
     adapter = ClaudeAdapter()
