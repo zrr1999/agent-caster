@@ -47,7 +47,7 @@ docs-build:
 docs-check: docs-build
 
 # Full CI check (format + check + test)
-ci: format check test
+ci: pre-commit format check test
 
 # Clean build artifacts
 clean:
