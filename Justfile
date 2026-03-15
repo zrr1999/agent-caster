@@ -13,13 +13,10 @@ format:
     uvx ruff format
     uvx ruff check --fix
 
-# Lint checking (without auto-fix)
-lint:
-    uvx ruff check .
-
 # Type check
 check:
-    uvx ty check src/
+    uvx ruff check .
+    uvx ty check .
 
 # Run tests (quick, no coverage)
 test:
@@ -49,8 +46,8 @@ docs-build:
 # Verify documentation can build
 docs-check: docs-build
 
-# Full CI check (format + lint + check + test)
-ci: format lint check test
+# Full CI check (format + check + test)
+ci: format check test
 
 # Clean build artifacts
 clean:

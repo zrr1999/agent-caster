@@ -5,7 +5,8 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-from role_forge.log import logger
+from loguru import logger
+
 from role_forge.models import ProjectConfig, TargetConfig
 
 CONFIG_FILENAME = "roles.toml"

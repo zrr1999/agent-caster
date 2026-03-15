@@ -38,3 +38,10 @@ Typical project flow:
 - platform adapters isolated behind a shared render pipeline
 - incremental adoption for projects that only need one target
 - extension through Python entry points for third-party adapters
+
+## Design principles
+
+- **Single source of truth**: All platform outputs are generated from canonical roles; generated files are not edited by hand.
+- **Abstract over concrete**: Canonical definitions use logical tiers (e.g. `reasoning` / `coding`) and capability groups (e.g. `read`), mapped to platform-specific models and tools by adapters.
+- **Safe defaults**: Deny-by-default for permissions; bash whitelists and delegation are explicit in role definitions.
+- **Extensibility**: Adapters register via Python entry points; third parties can add new targets without changing core code.

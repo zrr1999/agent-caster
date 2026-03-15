@@ -1,5 +1,10 @@
 # CLI
 
+## Source format
+
+- **GitHub**: `org/repo` or `org/repo@ref` (branch/tag). Resolved to the repository; `ref` is used for checkout.
+- **Local**: `./path` or `/absolute/path`. Roles are copied from the path; no git.
+
 ## Install
 
 ```bash
@@ -84,3 +89,10 @@ When `--target` is omitted, `role-forge` detects supported tools from project ma
 - OpenCode: `.opencode/` or `opencode.json`
 - Cursor: `.cursor/` or `.cursorrules`
 - Windsurf: `.windsurf/` or `.windsurfrules`
+
+## Behavior notes
+
+- **Overwrite**: Without `--yes`, `add` and `update` prompt before overwriting existing roles.
+- **Update**: Only non-local sources can be updated; local paths must be re-added.
+- **Remove**: Deletes the canonical role file only; run `render` to regenerate target outputs or clean up platform dirs.
+- **Scope**: Project scope uses `roles_dir` from `roles.toml` (default `.agents/roles/`); user scope uses `~/.agents/roles/` (see configuration).

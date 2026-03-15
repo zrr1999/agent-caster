@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
+from loguru import logger
 from pydantic import ValidationError
 
 from role_forge import config as config_module
-from role_forge.log import logger
 from role_forge.models import AgentDef, HierarchyConfig, ModelConfig
 
 

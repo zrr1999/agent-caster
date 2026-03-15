@@ -6,6 +6,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from loguru import logger
+
 from role_forge.config import find_config, load_config
 
 
@@ -100,7 +102,7 @@ def _git_clone(url: str, dest: Path, ref: str | None) -> None:
 
 
 def _git_fetch(repo_dir: Path, ref: str | None) -> None:
-    """Fetch and checkout in an existing clone."""
+    """Fetch and checkout in an existing clone (update cache to latest remote)."""
     subprocess.run(
         ["git", "fetch", "origin"],
         cwd=repo_dir,
@@ -109,6 +111,20 @@ def _git_fetch(repo_dir: Path, ref: str | None) -> None:
         text=True,
     )
     _ensure_head_checked_out(repo_dir, ref)
+    # For default branch (no explicit ref), fast-forward local branch to origin.
+    # This keeps the cached repo up to date between role-forge runs.
+    if ref is None:
+        result = subprocess.run(
+            ["git", "pull", "--ff-only", "origin"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        stdout = (result.stdout or "").strip()
+        # Only log when the pull actually updated something (not "Already up to date.").
+        if stdout and "Already up to date" not in stdout:
+            logger.info(f"  • updated source cache from origin: {repo_dir}")
 
 
 def _ensure_head_checked_out(repo_dir: Path, ref: str | None) -> None:
