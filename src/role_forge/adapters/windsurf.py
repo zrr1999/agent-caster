@@ -44,6 +44,7 @@ class WindsurfAdapter(BaseAdapter):
     name = "windsurf"
     base_dir = ".windsurf/rules"
     file_suffix = ".md"
+    requires_model_map = False
 
     def _serialize_frontmatter(self, description: str) -> str:
         """Emit Windsurf rule frontmatter."""

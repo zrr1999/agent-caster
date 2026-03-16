@@ -224,6 +224,26 @@ def test_add_with_explicit_target(tmp_path):
     assert (project / ".claude" / "agents" / "explorer.md").is_file()
 
 
+def test_add_fails_when_source_contains_invalid_role(tmp_path):
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (roles / "good.md").write_text("---\nname: good\n---\n# Good\n")
+    (roles / "bad.md").write_text("not valid frontmatter\n")
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    result = runner.invoke(
+        app,
+        ["add", str(source), "--yes", "--no-render", "--project-dir", str(project)],
+    )
+
+    assert result.exit_code == 1
+    assert "bad.md" in result.output
+    assert not (project / ".agents" / "roles" / "good.md").exists()
+
+
 def test_add_preserves_nested_role_paths_and_cast_output(tmp_path):
     source = tmp_path / "source"
     roles = source / "roles"
@@ -317,6 +337,18 @@ def test_list_no_agents(tmp_path):
     assert result.exit_code == 1
 
 
+def test_list_fails_when_any_installed_role_is_invalid(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "good.md").write_text("---\nname: good\n---\n# Good\n")
+    (roles_dir / "bad.md").write_text("not valid frontmatter\n")
+
+    result = runner.invoke(app, ["list", "--project-dir", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "bad.md" in result.output
+
+
 # -- render command ------------------------------------------------------------
 
 
@@ -339,6 +371,120 @@ def test_render_with_target(tmp_path):
     )
     assert result.exit_code == 0
     assert (tmp_path / ".claude" / "agents" / "explorer.md").is_file()
+
+
+def test_render_cursor_respects_target_config_without_model_map(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+    (tmp_path / "roles.toml").write_text(
+        '[targets.cursor]\noutput_dir = "generated"\noutput_layout = "flatten"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "cursor", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    agent_file = tmp_path / "generated" / ".cursor" / "agents" / "explorer.mdc"
+    assert agent_file.is_file()
+    assert "model:" not in agent_file.read_text()
+
+
+def test_render_windsurf_succeeds_without_model_map(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text(
+        "---\nname: explorer\ndescription: Explorer\n---\n# Explorer\n"
+    )
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "windsurf", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    agent_file = tmp_path / ".windsurf" / "rules" / "explorer.md"
+    assert agent_file.is_file()
+    assert "model:" not in agent_file.read_text()
+
+
+def test_render_fails_when_any_installed_role_is_invalid(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "good.md").write_text("---\nname: good\n---\n# Good\n")
+    (roles_dir / "bad.md").write_text("not valid frontmatter\n")
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 1
+    assert "bad.md" in result.output
+    assert not (tmp_path / ".claude" / "agents" / "good.md").exists()
+
+
+def test_render_rejects_output_dir_outside_project(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+    (tmp_path / "roles.toml").write_text(
+        "[targets.claude]\n"
+        'output_dir = "../outside"\n'
+        "[targets.claude.model_map]\n"
+        'reasoning = "opus"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 1
+    assert "outside the project" in result.output
+    assert not (tmp_path / ".claude" / "agents" / "explorer.md").exists()
+    assert not (tmp_path.parent / "outside").exists()
+
+
+def test_render_rejects_absolute_output_dir(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+    outside = tmp_path / "absolute-output"
+    (tmp_path / "roles.toml").write_text(
+        "[targets.claude]\n"
+        f'output_dir = "{outside}"\n'
+        "[targets.claude.model_map]\n"
+        'reasoning = "opus"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 1
+    assert "project-relative" in result.output
+    assert not outside.exists()
+
+
+def test_render_allows_normalized_output_dir_inside_project(tmp_path):
+    roles_dir = tmp_path / ".agents" / "roles"
+    roles_dir.mkdir(parents=True)
+    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+    (tmp_path / "roles.toml").write_text(
+        '[targets.cursor]\noutput_dir = "generated/../generated-safe"\n'
+    )
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "cursor", "--project-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "generated-safe" / ".cursor" / "agents" / "explorer.mdc").is_file()
 
 
 def test_render_merges_user_and_project_agents(tmp_path, monkeypatch):
@@ -373,6 +519,46 @@ def test_render_merges_user_and_project_agents(tmp_path, monkeypatch):
     shared_content = (project / ".claude" / "agents" / "shared.md").read_text()
     assert "Project shared" in shared_content
     assert "claude-sonnet-4" in shared_content
+
+
+def test_render_fails_when_user_scope_contains_invalid_role(tmp_path, monkeypatch):
+    project = tmp_path / "project"
+    project_roles = project / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+    (project_roles / "good.md").write_text("---\nname: good\n---\n# Good\n")
+    (user_roles / "bad.md").write_text("not valid frontmatter\n")
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--project-dir", str(project)],
+    )
+
+    assert result.exit_code == 1
+    assert "bad.md" in result.output
+
+
+def test_render_fails_when_project_scope_contains_invalid_role_with_valid_user_scope(
+    tmp_path, monkeypatch
+):
+    project = tmp_path / "project"
+    project_roles = project / ".agents" / "roles"
+    user_roles = tmp_path / "user-roles"
+    project_roles.mkdir(parents=True)
+    user_roles.mkdir(parents=True)
+    (project_roles / "bad.md").write_text("not valid frontmatter\n")
+    (user_roles / "good.md").write_text("---\nname: good\n---\n# Good\n")
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+
+    result = runner.invoke(
+        app,
+        ["render", "--target", "claude", "--project-dir", str(project)],
+    )
+
+    assert result.exit_code == 1
+    assert "bad.md" in result.output
 
 
 def test_render_no_agents(tmp_path, monkeypatch):
@@ -817,6 +1003,33 @@ def test_add_opencode_uses_source_repo_model_map(tmp_path):
     assert agent_file.is_file()
     content = agent_file.read_text()
     assert "my-reasoning-model" in content
+
+
+def test_add_cursor_uses_source_repo_target_config_without_model_map(tmp_path):
+    source = tmp_path / "source"
+    roles = source / "roles"
+    roles.mkdir(parents=True)
+    (source / "roles.toml").write_text(
+        "[project]\n"
+        'roles_dir = "roles"\n\n'
+        "[targets.cursor]\n"
+        "enabled = true\n"
+        'output_dir = "generated"\n'
+    )
+    (roles / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    result = runner.invoke(
+        app,
+        ["add", str(source), "--yes", "--project-dir", str(project)],
+    )
+
+    assert result.exit_code == 0, result.output
+    agent_file = project / "generated" / ".cursor" / "agents" / "explorer.mdc"
+    assert agent_file.is_file()
+    assert "model:" not in agent_file.read_text()
 
 
 def test_full_workflow_add_list_render_remove(tmp_path):

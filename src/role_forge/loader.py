@@ -46,7 +46,7 @@ def load_agents(roles_dir: Path, *, strict: bool = False) -> list[AgentDef]:
             agents.append(parse_agent_file(md_path, roles_dir=roles_dir))
         except LoadError as exc:
             if strict:
-                raise
+                raise LoadError(f"{md_path.relative_to(roles_dir)}: {exc}") from exc
             logger.warning(f"Skipping {md_path.relative_to(roles_dir)}: {exc}", exc_info=True)
     logger.debug(f"Loaded {len(agents)} agent(s) from {roles_dir}")
     return agents
@@ -65,7 +65,7 @@ def load_agents_in_scope(
     )
     if not roles_dir.is_dir():
         return roles_dir, []
-    return roles_dir, load_agents(roles_dir)
+    return roles_dir, load_agents(roles_dir, strict=True)
 
 
 def load_merged_agents(project: Path, *, include_user: bool = True) -> list[AgentDef]:
@@ -146,14 +146,18 @@ def parse_agent_file(md_path: Path, *, roles_dir: Path | None = None) -> AgentDe
 
 def _split_frontmatter(text: str) -> tuple[str, str]:
     """Split YAML frontmatter from markdown body."""
-    if not text.startswith("---"):
+    if not text.startswith("---\n") and text != "---":
         raise LoadError("File does not start with YAML frontmatter (---)")
-    try:
-        end = text.index("---", 3)
-    except ValueError as exc:
-        raise LoadError("Missing closing --- for YAML frontmatter") from exc
-    fm_text = text[3:end]
-    body = text[end + 3 :].lstrip("\n")
+    lines = text.splitlines(keepends=True)
+    end_index: int | None = None
+    for idx, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            end_index = idx
+            break
+    if end_index is None:
+        raise LoadError("Missing closing --- for YAML frontmatter")
+    fm_text = "".join(lines[1:end_index])
+    body = "".join(lines[end_index + 1 :]).lstrip("\n")
     return fm_text, body
 
 
@@ -162,9 +166,9 @@ def _resolve_prompt(defn: dict, body: str, file_dir: Path) -> str:
     prompt_file = defn.get("prompt_file")
     if prompt_file:
         prompt_path = (file_dir / prompt_file).resolve()
-        if prompt_path.is_file():
-            return prompt_path.read_text(encoding="utf-8")
-        return ""
+        if not prompt_path.is_file():
+            raise LoadError(f"Referenced prompt_file does not exist: {prompt_file}")
+        return prompt_path.read_text(encoding="utf-8")
     return body
 
 

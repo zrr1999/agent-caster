@@ -92,6 +92,30 @@ def _resolve_target_config(
     from role_forge.config import find_config, load_config
     from role_forge.models import TargetConfig
 
+    def _is_within_root(root: Path, candidate: Path) -> bool:
+        try:
+            candidate.relative_to(root)
+            return True
+        except ValueError:
+            return False
+
+    def _validate_output_dir(cfg: TargetConfig, *, root: Path) -> TargetConfig:
+        if Path(cfg.output_dir).is_absolute():
+            _error(f"Target '{target_name}' output_dir must be project-relative: {cfg.output_dir}")
+            raise typer.Exit(1)
+        output_path = (root / cfg.output_dir).resolve()
+        if not _is_within_root(root.resolve(), output_path):
+            _error(
+                f"Target '{target_name}' output_dir points outside the project: {cfg.output_dir}"
+            )
+            raise typer.Exit(1)
+        return cfg
+
+    def _accept_config(cfg: TargetConfig, *, root: Path) -> TargetConfig | None:
+        if adapter.requires_model_map and not cfg.model_map:
+            return None
+        return _validate_output_dir(cfg, root=root)
+
     # Prefer source repo roles.toml when rendering after add/update
     if source_project is not None:
         src_config_path = find_config(source_project)
@@ -99,23 +123,34 @@ def _resolve_target_config(
             src_config = load_config(src_config_path)
             if target_name in src_config.targets:
                 cfg = src_config.targets[target_name]
-                if cfg.model_map:
-                    return cfg
+                accepted = _accept_config(cfg, root=project)
+                if accepted is not None:
+                    return accepted
 
     config_path = find_config(project)
     if config_path is not None:
         project_config = load_config(config_path)
         if target_name in project_config.targets:
             cfg = project_config.targets[target_name]
-            if cfg.model_map:
-                return cfg
+            accepted = _accept_config(cfg, root=project)
+            if accepted is not None:
+                return accepted
 
     if adapter.default_model_map:
-        return TargetConfig(
-            name=target_name,
-            enabled=True,
-            output_dir=".",
-            model_map=adapter.default_model_map,
+        return _validate_output_dir(
+            TargetConfig(
+                name=target_name,
+                enabled=True,
+                output_dir=".",
+                model_map=adapter.default_model_map,
+            ),
+            root=project,
+        )
+
+    if not adapter.requires_model_map:
+        return _validate_output_dir(
+            TargetConfig(name=target_name, enabled=True, output_dir="."),
+            root=project,
         )
 
     _error(
@@ -158,7 +193,11 @@ def _roles_not_found_message(scope: Scope, roles_dir: Path) -> str:
 def _load_agents_in_scope(project: Path, scope: Scope):
     from role_forge.loader import load_agents_in_scope
 
-    roles_dir, agents = load_agents_in_scope(project, scope=scope)
+    try:
+        roles_dir, agents = load_agents_in_scope(project, scope=scope)
+    except Exception as exc:
+        _error(str(exc))
+        raise typer.Exit(1) from exc
     if agents:
         return roles_dir, agents
 
@@ -169,7 +208,11 @@ def _load_agents_in_scope(project: Path, scope: Scope):
 def _load_merged_agents(project: Path):
     from role_forge.loader import load_merged_agents
 
-    agents = load_merged_agents(project)
+    try:
+        agents = load_merged_agents(project)
+    except Exception as exc:
+        _error(str(exc))
+        raise typer.Exit(1) from exc
     if agents:
         return agents
 
@@ -464,7 +507,11 @@ def add(
         if enabled_targets:
             source_default_targets = enabled_targets
 
-    agents = load_agents(roles_dir)
+    try:
+        agents = load_agents(roles_dir, strict=True)
+    except Exception as e:
+        _error(str(e))
+        raise typer.Exit(1) from e
     if not agents:
         _error("No role definitions found in source.")
         raise typer.Exit(1)
@@ -532,7 +579,11 @@ def list_agents(
 
     project = _resolve_project(project_dir)
     scope = _resolve_scope(global_install)
-    roles_dir, agents = load_agents_in_scope(project, scope=scope)
+    try:
+        roles_dir, agents = load_agents_in_scope(project, scope=scope)
+    except Exception as exc:
+        _error(str(exc))
+        raise typer.Exit(1) from exc
 
     if json_output:
         typer.echo(json.dumps([_serialize_agent(agent, scope=scope) for agent in agents], indent=2))

@@ -95,7 +95,7 @@ def test_fetch_github_clones_to_cache(mock_run, tmp_path):
     src = parse_source("PFCCLab/precision-agents@main")
     result = fetch_source(src, cache_root=tmp_path)
 
-    expected_dir = tmp_path / "PFCCLab" / "precision-agents"
+    expected_dir = tmp_path / "PFCCLab" / "precision-agents@main"
     assert result == expected_dir
     assert mock_run.call_count >= 5
     clone_call = mock_run.call_args_list[0]
@@ -144,14 +144,12 @@ def test_fetch_github_pulls_existing_cache(mock_run, tmp_path):
     """If cache exists, should git fetch + checkout instead of clone."""
     mock_run.side_effect = [
         MagicMock(returncode=0),
-        MagicMock(returncode=0, stdout="refs/remotes/origin/main\n"),
-        MagicMock(returncode=1, stdout="", stderr="", output=""),
         MagicMock(returncode=1, stdout="", stderr="", output=""),
         MagicMock(returncode=0, stdout="", stderr="", output=""),
         MagicMock(returncode=0),
     ]
 
-    cache_dir = tmp_path / "PFCCLab" / "precision-agents"
+    cache_dir = tmp_path / "PFCCLab" / "precision-agents@v1.0"
     cache_dir.mkdir(parents=True)
     (cache_dir / ".git").mkdir()
 
@@ -159,22 +157,52 @@ def test_fetch_github_pulls_existing_cache(mock_run, tmp_path):
     result = fetch_source(src, cache_root=tmp_path)
 
     assert result == cache_dir
-    calls_str = str(mock_run.call_args_list)
-    assert "fetch" in calls_str
+    assert mock_run.call_args_list[0].args[0] == ["git", "fetch", "origin"]
+    assert any(call.args[0] == ["git", "checkout", "v1.0"] for call in mock_run.call_args_list)
+
+
+@patch("role_forge.registry._git_clone")
+@patch("role_forge.registry._git_fetch")
+def test_fetch_github_uses_distinct_cache_paths_per_ref(mock_fetch, mock_clone, tmp_path):
+    main = parse_source("PFCCLab/precision-agents@main")
+    stable = parse_source("PFCCLab/precision-agents@stable")
+
+    main_path = fetch_source(main, cache_root=tmp_path)
+    stable_path = fetch_source(stable, cache_root=tmp_path)
+
+    assert main_path != stable_path
+    assert main_path == tmp_path / "PFCCLab" / "precision-agents@main"
+    assert stable_path == tmp_path / "PFCCLab" / "precision-agents@stable"
+    assert mock_clone.call_count == 2
+    mock_fetch.assert_not_called()
+
+
+def test_cache_key_includes_ref_when_present():
+    assert parse_source("PFCCLab/precision-agents").cache_key == "PFCCLab/precision-agents"
+    assert (
+        parse_source("PFCCLab/precision-agents@main").cache_key == "PFCCLab/precision-agents@main"
+    )
+
+
+@patch("role_forge.registry._git_clone")
+@patch("role_forge.registry._git_fetch")
+def test_fetch_github_distinguishes_default_branch_from_explicit_main(
+    mock_fetch, mock_clone, tmp_path
+):
+    default = parse_source("PFCCLab/precision-agents")
+    explicit = parse_source("PFCCLab/precision-agents@main")
+
+    default_path = fetch_source(default, cache_root=tmp_path)
+    explicit_path = fetch_source(explicit, cache_root=tmp_path)
+
+    assert default_path == tmp_path / "PFCCLab" / "precision-agents"
+    assert explicit_path == tmp_path / "PFCCLab" / "precision-agents@main"
+    assert default_path != explicit_path
+    assert mock_clone.call_count == 2
+    mock_fetch.assert_not_called()
 
 
 # --- find_roles_dir tests ---
-
-
-def test_find_roles_dir_with_roles_toml(tmp_path):
-    """roles.toml roles_dir is honoured (canonical name)."""
-    (tmp_path / "roles.toml").write_text('[project]\nroles_dir = "my-agents"')
-    agents = tmp_path / "my-agents"
-    agents.mkdir()
-    (agents / "test.md").write_text("---\nname: test\n---\n")
-
-    result = find_roles_dir(tmp_path)
-    assert result == agents
 
 
 def test_find_roles_dir_with_roles_dir_key(tmp_path):
