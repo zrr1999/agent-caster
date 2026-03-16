@@ -33,6 +33,7 @@ class CursorAdapter(BaseAdapter):
     name: ClassVar[str] = "cursor"
     base_dir = ".cursor/agents"
     file_suffix = ".mdc"
+    requires_model_map = False
     # Cursor doesn't support per-agent model selection; default_model_map stays empty
 
     def _serialize_frontmatter(self, name: str, description: str) -> str:

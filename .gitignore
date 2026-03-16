@@ -47,3 +47,4 @@ pyrightconfig.json
 .DS_Store
 Thumbs.db
 .vercel
+_version.py

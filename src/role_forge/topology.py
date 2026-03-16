@@ -108,6 +108,10 @@ def resolve_allowed_children(
 
 def build_output_path(agent: AgentDef, *, base_dir: str, suffix: str, config: TargetConfig) -> str:
     """Return the target output path for an agent under the selected layout."""
+    base_path = PurePosixPath(base_dir)
+    if base_path.is_absolute() or ".." in base_path.parts:
+        raise TopologyError(f"Output base directory '{base_dir}' escapes base directory bounds")
+
     output_id = agent.output_id(config.output_layout)
     if config.output_layout == "preserve":
         return f"{base_dir}/{output_id}{suffix}"

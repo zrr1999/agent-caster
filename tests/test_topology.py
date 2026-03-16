@@ -7,7 +7,12 @@ import importlib.util
 import pytest
 
 from role_forge.models import AgentDef, HierarchyConfig, ModelConfig, TargetConfig
-from role_forge.topology import TopologyError, validate_agents, validate_output_layout
+from role_forge.topology import (
+    TopologyError,
+    build_output_path,
+    validate_agents,
+    validate_output_layout,
+)
 
 _HAS_PYTEST_CODSPEED = importlib.util.find_spec("pytest_codspeed") is not None
 
@@ -149,6 +154,14 @@ def test_validate_output_layout_rejects_flatten_collisions() -> None:
 
     with pytest.raises(TopologyError, match="maps both"):
         validate_output_layout(agents, config)
+
+
+def test_build_output_path_rejects_path_escape() -> None:
+    agent = AgentDef(name="escape", relative_path="roles/escape.md")
+    config = TargetConfig(name="claude", output_layout="preserve")
+
+    with pytest.raises(TopologyError, match="escapes base directory"):
+        build_output_path(agent, base_dir="../outside", suffix=".md", config=config)
 
 
 def test_validate_agents_balanced_tree() -> None:

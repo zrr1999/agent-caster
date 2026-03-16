@@ -14,7 +14,6 @@ from role_forge.config import (
 def test_load_config_from_fixtures(fixtures_dir):
     config = load_config(fixtures_dir / "roles.toml")
     assert config.roles_dir == ".agents/roles"
-    assert config.roles_dir == ".agents/roles"
     assert "opencode" in config.targets
     assert "claude" in config.targets
 

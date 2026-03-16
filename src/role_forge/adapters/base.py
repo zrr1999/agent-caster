@@ -16,6 +16,7 @@ class BaseAdapter(ABC):
     base_dir: ClassVar[str]
     file_suffix: ClassVar[str]
     default_model_map: ClassVar[dict[str, str]] = {}
+    requires_model_map: ClassVar[bool] = True
     prompt_separator: ClassVar[str] = "\n"
 
     def cast(self, agents: list[AgentDef], config: TargetConfig) -> list[OutputFile]:

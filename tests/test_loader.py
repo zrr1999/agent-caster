@@ -76,6 +76,13 @@ def test_split_frontmatter_no_closing():
         _split_frontmatter("---\nname: test\n# No closing")
 
 
+def test_split_frontmatter_ignores_body_thematic_break():
+    text = "---\nname: test\n---\n# Body\n\n---\n\nmore body\n"
+    fm, body = _split_frontmatter(text)
+    assert "name: test" in fm
+    assert body == "# Body\n\n---\n\nmore body\n"
+
+
 def test_load_agents_missing_dir():
     with pytest.raises(LoadError):
         load_agents(Path("/nonexistent/dir"))
@@ -102,7 +109,7 @@ def test_load_agents_strict_raises_on_bad_file(tmp_path: Path) -> None:
     roles_dir.mkdir()
     (roles_dir / "bad.md").write_text("no frontmatter here\n")
 
-    with pytest.raises(LoadError):
+    with pytest.raises(LoadError, match=r"bad\.md: File does not start with YAML frontmatter"):
         load_agents(roles_dir, strict=True)
 
 
@@ -166,6 +173,18 @@ def test_custom_tier_accepted(tmp_path: Path) -> None:
     agents = load_agents(roles_dir)
     assert len(agents) == 1
     assert agents[0].model.tier == "deep"
+
+
+def test_parse_agent_file_missing_prompt_file_raises(tmp_path: Path) -> None:
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir()
+    agent_file = roles_dir / "agent.md"
+    agent_file.write_text(
+        "---\nname: agent\nprompt_file: prompts/missing.md\n---\n# Inline body should not be used\n"
+    )
+
+    with pytest.raises(LoadError, match="prompt_file"):
+        parse_agent_file(agent_file, roles_dir=roles_dir)
 
 
 def test_parse_hierarchy_metadata(tmp_path: Path) -> None:

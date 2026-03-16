@@ -34,6 +34,8 @@ class ParsedSource:
     def cache_key(self) -> str:
         if self.is_local:
             raise ValueError("Local source has no cache key")
+        if self.ref:
+            return f"{self.org}/{self.repo}@{self.ref}"
         return f"{self.org}/{self.repo}"
 
 
