@@ -780,6 +780,47 @@ def test_update_global_passes_scope(monkeypatch, tmp_path):
     ]
 
 
+def test_update_prunes_orphaned_agents(monkeypatch, tmp_path):
+    """When update runs and source has removed an agent, the orphaned file is pruned."""
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    roles = cache / "roles"
+    roles.mkdir()
+    (roles / "a.md").write_text("---\nname: a\n---\n# A")
+    (roles / "b.md").write_text("---\nname: b\n---\n# B")
+
+    def fetch_source(parsed):
+        return cache
+
+    monkeypatch.setattr("role_forge.registry.fetch_source", fetch_source)
+    user_roles = tmp_path / ".agents" / "roles"
+    monkeypatch.setattr(config_module, "USER_ROLES_DIR", user_roles)
+    user_roles.mkdir(parents=True)
+
+    result = runner.invoke(
+        app,
+        ["add", "org/repo", "-g", "--yes", "--no-render", "--project-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert (user_roles / "a.md").exists()
+    assert (user_roles / "b.md").exists()
+
+    (roles / "b.md").unlink()
+
+    result2 = runner.invoke(
+        app,
+        ["update", "org/repo", "-g", "--yes", "--no-render", "--project-dir", str(tmp_path)],
+    )
+    assert result2.exit_code == 0, result2.output
+    assert (user_roles / "a.md").exists()
+    assert not (user_roles / "b.md").exists()
+
+    result3 = runner.invoke(app, ["list", "-g", "--project-dir", str(tmp_path)])
+    assert result3.exit_code == 0
+    assert "2 role" not in result3.output
+    assert "1 role" in result3.output
+
+
 def test_doctor_reports_unmanaged_files(tmp_path):
     roles_dir = tmp_path / ".agents" / "roles"
     roles_dir.mkdir(parents=True)
