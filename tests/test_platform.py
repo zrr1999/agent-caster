@@ -63,6 +63,17 @@ def test_detect_windsurf_by_windsurfrules(tmp_path):
     assert "windsurf" in detect_platforms(tmp_path)
 
 
+def test_detect_copilot_by_instructions(tmp_path):
+    (tmp_path / ".github").mkdir()
+    (tmp_path / ".github" / "copilot-instructions.md").write_text("# Instructions")
+    assert "copilot" in detect_platforms(tmp_path)
+
+
+def test_detect_copilot_by_agents_dir(tmp_path):
+    (tmp_path / ".github" / "agents").mkdir(parents=True)
+    assert "copilot" in detect_platforms(tmp_path)
+
+
 def test_detect_all_four(tmp_path):
     (tmp_path / ".claude").mkdir()
     (tmp_path / ".opencode").mkdir()
@@ -71,6 +82,20 @@ def test_detect_all_four(tmp_path):
     platforms = detect_platforms(tmp_path)
     assert "claude" in platforms
     assert "opencode" in platforms
+    assert "cursor" in platforms
+    assert "windsurf" in platforms
+
+
+def test_detect_all_five(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".opencode").mkdir()
+    (tmp_path / ".github" / "agents").mkdir(parents=True)
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".windsurf").mkdir()
+    platforms = detect_platforms(tmp_path)
+    assert "claude" in platforms
+    assert "opencode" in platforms
+    assert "copilot" in platforms
     assert "cursor" in platforms
     assert "windsurf" in platforms
 

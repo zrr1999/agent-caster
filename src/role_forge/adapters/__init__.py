@@ -4,6 +4,7 @@ from importlib.metadata import entry_points
 
 from role_forge.adapters.base import BaseAdapter
 from role_forge.adapters.claude import ClaudeAdapter
+from role_forge.adapters.copilot import CopilotAdapter
 from role_forge.adapters.cursor import CursorAdapter
 from role_forge.adapters.opencode import OpenCodeAdapter
 from role_forge.adapters.windsurf import WindsurfAdapter
@@ -11,6 +12,7 @@ from role_forge.adapters.windsurf import WindsurfAdapter
 BUILTIN_ADAPTERS: dict[str, type[BaseAdapter]] = {
     "opencode": OpenCodeAdapter,
     "claude": ClaudeAdapter,
+    "copilot": CopilotAdapter,
     "cursor": CursorAdapter,
     "windsurf": WindsurfAdapter,
 }
