@@ -545,7 +545,34 @@ def add(
     if not include_overwrites and not plan.new_agents:
         _warn("Install cancelled.")
         raise typer.Exit(1)
+
+    # Prune orphaned files when doing full update from remote (agent removed upstream)
+    # Skip prune when --role filter is used (partial update)
+    if not parsed.is_local and role is None:
+        from role_forge.manifest import prune_orphaned, update_manifest_for_source
+
+        current_paths = {a.install_relative_path() for a in agents}
+        pruned = prune_orphaned(install_dir, parsed.cache_key, current_paths)
+        for p in pruned:
+            logger.info(_bullet("pruned", str(p.relative_to(install_dir))))
+
     installed_agents = _copy_agents(plan, yes, include_overwrites)
+
+    # Update manifest for remote sources so future updates can prune correctly
+    if not parsed.is_local:
+        from role_forge.manifest import update_manifest_for_source
+
+        # Merge with existing manifest when --role filter used (partial update)
+        if role is not None:
+            from role_forge.manifest import load_manifest, paths_for_source
+
+            existing = set(paths_for_source(load_manifest(install_dir), parsed.cache_key))
+            new_paths = existing | {a.install_relative_path() for a in agents}
+            update_manifest_for_source(install_dir, parsed.cache_key, sorted(new_paths))
+        else:
+            update_manifest_for_source(
+                install_dir, parsed.cache_key, [a.install_relative_path() for a in agents]
+            )
 
     if not installed_agents:
         _warn("No roles were installed.")
@@ -676,7 +703,11 @@ def remove(
     roles_dir, agents = _load_agents_in_scope(project, _resolve_scope(global_install))
     agent = _resolve_remove_target(agents, agent_name)
     agent_file = agent.source_path or roles_dir / agent.install_relative_path()
+    rel_path = agent.install_relative_path()
     agent_file.unlink()
+    from role_forge.manifest import remove_path_from_manifest
+
+    remove_path_from_manifest(roles_dir, rel_path)
     _success(f"Removed {agent.canonical_id}")
     _info("If target files still reference it, run `role-forge render` to regenerate outputs.")
 
