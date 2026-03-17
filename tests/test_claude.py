@@ -194,7 +194,8 @@ def test_cast_nested_agent_preserves_relative_path(claude_config):
     assert outputs[0].path == ".claude/agents/l2/scout.md"
 
 
-def test_cast_namespace_layout_uses_namespaced_delegate_ids() -> None:
+def test_cast_namespace_layout_uses_name_based_delegate_ids() -> None:
+    """Claude resolves Task() by agent name, regardless of output layout."""
     adapter = ClaudeAdapter()
     config = TargetConfig(
         name="claude",
@@ -219,4 +220,36 @@ def test_cast_namespace_layout_uses_namespaced_delegate_ids() -> None:
     outputs = adapter.cast(agents, config)
     by_path = {output.path: output.content for output in outputs}
     assert ".claude/agents/l1__orchestrator.md" in by_path
-    assert "Task(l3__worker)" in by_path[".claude/agents/l1__orchestrator.md"]
+    assert "Task(worker)" in by_path[".claude/agents/l1__orchestrator.md"]
+
+
+def test_cast_preserve_layout_uses_name_based_delegate_ids() -> None:
+    """Claude resolves Task() by agent name even with nested file paths."""
+    adapter = ClaudeAdapter()
+    config = TargetConfig(
+        name="claude",
+        output_layout="preserve",
+        model_map={"reasoning": "opus", "coding": "sonnet"},
+    )
+    agents = [
+        AgentDef(
+            name="coordinator",
+            description="Coordinator",
+            role="primary",
+            relative_path="directors/coordinator.md",
+            capabilities=[{"delegate": ["directors/precision-alignment"]}],
+        ),
+        AgentDef(
+            name="precision-alignment",
+            description="Aligner",
+            relative_path="directors/precision-alignment.md",
+        ),
+    ]
+
+    outputs = adapter.cast(agents, config)
+    by_path = {output.path: output.content for output in outputs}
+    assert ".claude/agents/directors/coordinator.md" in by_path
+    content = by_path[".claude/agents/directors/coordinator.md"]
+    assert "Task(precision-alignment)" in content
+    # Must NOT contain path-based reference
+    assert "Task(directors/precision-alignment)" not in content

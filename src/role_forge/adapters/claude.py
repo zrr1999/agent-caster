@@ -40,6 +40,10 @@ class ClaudeAdapter(BaseAdapter):
         "coding": "claude-sonnet-4",
     }
 
+    def _delegate_ref(self, target: AgentDef, config: TargetConfig) -> str:
+        """Claude Code resolves Task() targets by the agent's name: field."""
+        return target.name
+
     def _expand_capabilities(
         self,
         capabilities: list[str | dict],

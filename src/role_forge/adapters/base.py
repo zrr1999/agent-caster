@@ -27,7 +27,7 @@ class BaseAdapter(ABC):
         outputs: list[OutputFile] = []
         for agent in agents:
             delegates = [
-                target.output_id(config.output_layout)
+                self._delegate_ref(target, config)
                 for target in delegation_graph.get(agent.canonical_id, [])
             ]
             outputs.append(
@@ -42,6 +42,14 @@ class BaseAdapter(ABC):
                 )
             )
         return outputs
+
+    def _delegate_ref(self, target: AgentDef, config: TargetConfig) -> str:
+        """Build the delegate reference string for rendered output.
+
+        Override in subclasses when the target platform resolves agents by
+        name rather than by output path.
+        """
+        return target.output_id(config.output_layout)
 
     @staticmethod
     def _resolve_model(model: ModelConfig, model_map: dict[str, str]) -> str:
