@@ -321,8 +321,7 @@ def test_cast_nested_agent_preserves_relative_path(opencode_config):
     assert outputs[0].path == ".opencode/agents/l2/scout.md"
 
 
-def test_cast_namespace_layout_uses_name_based_task_permissions() -> None:
-    """OpenCode resolves task permissions by agent name, regardless of output layout."""
+def test_cast_namespace_layout_uses_namespaced_task_permissions() -> None:
     adapter = OpenCodeAdapter()
     config = TargetConfig(
         name="opencode",
@@ -343,36 +342,4 @@ def test_cast_namespace_layout_uses_name_based_task_permissions() -> None:
     outputs = adapter.cast(agents, config)
     by_path = {output.path: output.content for output in outputs}
     assert ".opencode/agents/l1__orchestrator.md" in by_path
-    assert '"worker": allow' in by_path[".opencode/agents/l1__orchestrator.md"]
-
-
-def test_cast_preserve_layout_uses_name_based_task_permissions() -> None:
-    """OpenCode resolves task permissions by agent name even with nested paths."""
-    adapter = OpenCodeAdapter()
-    config = TargetConfig(
-        name="opencode",
-        output_layout="preserve",
-        model_map={"reasoning": "model-r", "coding": "model-c"},
-    )
-    agents = [
-        AgentDef(
-            name="coordinator",
-            description="Coordinator",
-            role="primary",
-            relative_path="directors/coordinator.md",
-            capabilities=[{"delegate": ["directors/precision-alignment"]}],
-        ),
-        AgentDef(
-            name="precision-alignment",
-            description="Aligner",
-            relative_path="directors/precision-alignment.md",
-        ),
-    ]
-
-    outputs = adapter.cast(agents, config)
-    by_path = {output.path: output.content for output in outputs}
-    assert ".opencode/agents/directors/coordinator.md" in by_path
-    content = by_path[".opencode/agents/directors/coordinator.md"]
-    assert '"precision-alignment": allow' in content
-    # Must NOT contain path-based reference
-    assert '"directors/precision-alignment": allow' not in content
+    assert '"l3__worker": allow' in by_path[".opencode/agents/l1__orchestrator.md"]

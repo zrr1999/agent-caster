@@ -16,10 +16,6 @@ class OpenCodeAdapter(BaseAdapter):
     file_suffix = ".md"
     prompt_separator = "\n\n"
 
-    def _delegate_ref(self, target: AgentDef, config: TargetConfig) -> str:
-        """OpenCode resolves task permissions by the agent's name."""
-        return target.name
-
     def _expand_capabilities(
         self,
         capabilities: list[str | dict],

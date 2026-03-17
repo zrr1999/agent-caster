@@ -148,8 +148,8 @@
       permission:
         "task":
           "*": deny
-          "feature-lead": allow
-          "research-helper": allow
+          "nested/feature-lead": allow
+          "nested/support/research-helper": allow
         "edit": allow
         "write": allow
       ---
