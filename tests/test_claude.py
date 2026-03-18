@@ -187,11 +187,11 @@ def test_expand_capabilities_returns_canonical_spec(claude_config):
     )
 
 
-def test_cast_nested_agent_preserves_relative_path(claude_config):
+def test_cast_nested_agent_uses_namespace_layout_by_default(claude_config):
     agent = AgentDef(name="scout", description="Scout", relative_path="l2/scout.md")
     adapter = ClaudeAdapter()
     outputs = adapter.cast([agent], claude_config)
-    assert outputs[0].path == ".claude/agents/l2/scout.md"
+    assert outputs[0].path == ".claude/agents/l2__scout.md"
 
 
 def test_cast_namespace_layout_uses_name_based_delegate_ids() -> None:

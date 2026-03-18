@@ -61,7 +61,7 @@ def test_model_less_adapter_omits_empty_description(
 
 
 @pytest.mark.parametrize(("adapter_cls", "target_name", "base_dir", "suffix"), ADAPTER_CASES)
-def test_model_less_adapter_preserves_relative_role_path(
+def test_model_less_adapter_nested_role_respects_default_layout(
     adapter_cls,
     target_name: str,
     base_dir: str,
@@ -71,7 +71,11 @@ def test_model_less_adapter_preserves_relative_role_path(
 
     outputs = adapter_cls().cast([agent], _config(target_name))
 
-    assert outputs[0].path == f"{base_dir}/l3/worker{suffix}"
+    adapter = adapter_cls()
+    if adapter.default_output_layout == "namespace":
+        assert outputs[0].path == f"{base_dir}/l3__worker{suffix}"
+    else:
+        assert outputs[0].path == f"{base_dir}/l3/worker{suffix}"
 
 
 @pytest.mark.parametrize(("adapter_cls", "target_name", "_base_dir", "_suffix"), ADAPTER_CASES)

@@ -35,6 +35,7 @@ class ClaudeAdapter(BaseAdapter):
     name = "claude"
     base_dir = ".claude/agents"
     file_suffix = ".md"
+    default_output_layout = "namespace"
     default_model_map: ClassVar[dict[str, str]] = {
         "reasoning": "claude-opus-4-6",
         "coding": "claude-sonnet-4",

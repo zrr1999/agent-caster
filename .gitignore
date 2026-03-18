@@ -48,3 +48,6 @@ pyrightconfig.json
 Thumbs.db
 .vercel
 _version.py
+.agents/
+.claude/
+.github/agents/

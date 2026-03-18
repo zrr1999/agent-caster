@@ -16,11 +16,24 @@ class BaseAdapter(ABC):
     base_dir: ClassVar[str]
     file_suffix: ClassVar[str]
     default_model_map: ClassVar[dict[str, str]] = {}
+    default_output_layout: ClassVar[str] = "preserve"
     requires_model_map: ClassVar[bool] = True
     prompt_separator: ClassVar[str] = "\n"
 
+    def _effective_config(self, config: TargetConfig) -> TargetConfig:
+        """Apply adapter defaults to the target configuration.
+
+        When the caller has not explicitly set ``output_layout`` (i.e. it is
+        ``None``), the adapter's own ``default_output_layout`` takes
+        precedence.
+        """
+        if config.output_layout is None:
+            return config.model_copy(update={"output_layout": self.default_output_layout})
+        return config
+
     def cast(self, agents: list[AgentDef], config: TargetConfig) -> list[OutputFile]:
         """Validate topology and render all agents for the target platform."""
+        config = self._effective_config(config)
         delegation_graph = validate_agents(agents)
         validate_output_layout(agents, config)
 

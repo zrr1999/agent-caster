@@ -274,8 +274,8 @@ def test_add_preserves_nested_role_paths_and_cast_output(tmp_path):
     assert result.exit_code == 0, result.output
     assert (project / ".agents" / "roles" / "l2" / "lead.md").is_file()
     assert (project / ".agents" / "roles" / "l3" / "worker.md").is_file()
-    assert (project / ".claude" / "agents" / "l2" / "lead.md").is_file()
-    assert (project / ".claude" / "agents" / "l3" / "worker.md").is_file()
+    assert (project / ".claude" / "agents" / "l2__lead.md").is_file()
+    assert (project / ".claude" / "agents" / "l3__worker.md").is_file()
 
 
 # -- list command --------------------------------------------------------------

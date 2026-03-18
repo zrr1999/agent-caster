@@ -113,7 +113,7 @@ def build_output_path(agent: AgentDef, *, base_dir: str, suffix: str, config: Ta
         raise TopologyError(f"Output base directory '{base_dir}' escapes base directory bounds")
 
     output_id = agent.output_id(config.output_layout)
-    if config.output_layout == "preserve":
+    if config.output_layout in ("preserve", None):
         return f"{base_dir}/{output_id}{suffix}"
     return f"{base_dir}/{PurePosixPath(output_id).name}{suffix}"
 
