@@ -56,7 +56,7 @@ def _parse_target(name: str, raw: dict) -> TargetConfig:
         name=name,
         enabled=raw.get("enabled", True),
         output_dir=raw.get("output_dir", "."),
-        output_layout=raw.get("output_layout", "preserve"),
+        output_layout=raw.get("output_layout"),
         model_map=raw.get("model_map", {}),
         capability_map=raw.get("capability_map", {}),
     )

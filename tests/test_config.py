@@ -23,7 +23,7 @@ def test_opencode_target_config(fixtures_dir):
     oc = config.targets["opencode"]
     assert oc.enabled is True
     assert oc.output_dir == "."
-    assert oc.output_layout == "preserve"
+    assert oc.output_layout is None
     assert oc.model_map["reasoning"] == "github-copilot/claude-opus-4.6"
     assert oc.model_map["coding"] == "github-copilot/gpt-5.2-codex"
 

@@ -36,6 +36,7 @@ class CopilotAdapter(BaseAdapter):
     name = "copilot"
     base_dir = ".github/agents"
     file_suffix = ".md"
+    default_output_layout = "namespace"
     requires_model_map = False
 
     def _serialize_frontmatter(self, description: str) -> str:

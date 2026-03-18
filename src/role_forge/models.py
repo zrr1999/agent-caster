@@ -71,7 +71,7 @@ class AgentDef(BaseModel, frozen=True):
             canonical_path.parent.as_posix() if canonical_path.parent != PurePosixPath(".") else ""
         )
 
-    def output_id(self, layout: Literal["preserve", "namespace", "flatten"]) -> str:
+    def output_id(self, layout: Literal["preserve", "namespace", "flatten"] | None) -> str:
         """Target identifier used for output names and delegate references."""
         if layout == "flatten":
             return self.name
@@ -105,7 +105,7 @@ class TargetConfig(BaseModel, frozen=True):
     name: str
     enabled: bool = True
     output_dir: str = "."
-    output_layout: Literal["preserve", "namespace", "flatten"] = "preserve"
+    output_layout: Literal["preserve", "namespace", "flatten"] | None = None
     model_map: dict[str, str] = Field(default_factory=dict)
     capability_map: dict[str, dict[str, bool]] = Field(default_factory=dict)
 

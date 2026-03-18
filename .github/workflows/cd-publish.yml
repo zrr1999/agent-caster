@@ -1,4 +1,4 @@
-name: "CI - Publish"
+name: "CD - Publish"
 
 on:
   push:
