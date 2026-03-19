@@ -92,29 +92,10 @@ def _resolve_target_config(
     from role_forge.config import find_config, load_config
     from role_forge.models import TargetConfig
 
-    def _is_within_root(root: Path, candidate: Path) -> bool:
-        try:
-            candidate.relative_to(root)
-            return True
-        except ValueError:
-            return False
-
-    def _validate_output_dir(cfg: TargetConfig, *, root: Path) -> TargetConfig:
-        if Path(cfg.output_dir).is_absolute():
-            _error(f"Target '{target_name}' output_dir must be project-relative: {cfg.output_dir}")
-            raise typer.Exit(1)
-        output_path = (root / cfg.output_dir).resolve()
-        if not _is_within_root(root.resolve(), output_path):
-            _error(
-                f"Target '{target_name}' output_dir points outside the project: {cfg.output_dir}"
-            )
-            raise typer.Exit(1)
-        return cfg
-
-    def _accept_config(cfg: TargetConfig, *, root: Path) -> TargetConfig | None:
+    def _accept_config(cfg: TargetConfig) -> TargetConfig | None:
         if adapter.requires_model_map and not cfg.model_map:
             return None
-        return _validate_output_dir(cfg, root=root)
+        return cfg
 
     # Prefer source repo roles.toml when rendering after add/update
     if source_project is not None:
@@ -123,7 +104,7 @@ def _resolve_target_config(
             src_config = load_config(src_config_path)
             if target_name in src_config.targets:
                 cfg = src_config.targets[target_name]
-                accepted = _accept_config(cfg, root=project)
+                accepted = _accept_config(cfg)
                 if accepted is not None:
                     return accepted
 
@@ -132,26 +113,19 @@ def _resolve_target_config(
         project_config = load_config(config_path)
         if target_name in project_config.targets:
             cfg = project_config.targets[target_name]
-            accepted = _accept_config(cfg, root=project)
+            accepted = _accept_config(cfg)
             if accepted is not None:
                 return accepted
 
     if adapter.default_model_map:
-        return _validate_output_dir(
-            TargetConfig(
-                name=target_name,
-                enabled=True,
-                output_dir=".",
-                model_map=adapter.default_model_map,
-            ),
-            root=project,
+        return TargetConfig(
+            name=target_name,
+            enabled=True,
+            model_map=adapter.default_model_map,
         )
 
     if not adapter.requires_model_map:
-        return _validate_output_dir(
-            TargetConfig(name=target_name, enabled=True, output_dir="."),
-            root=project,
-        )
+        return TargetConfig(name=target_name, enabled=True)
 
     _error(
         f"No model_map for '{target_name}'. Add [targets.{target_name}.model_map] to roles.toml "
@@ -269,31 +243,27 @@ def _render_agents_to_targets(
             _error(str(e))
             raise typer.Exit(1) from e
 
-        outputs_to_write = _confirm_render_overwrite(
-            project, config.output_dir, outputs, interactive
-        )
+        outputs_to_write = _confirm_render_overwrite(project, outputs, interactive)
         if outputs_to_write:
-            _write_outputs(project, outputs_to_write, config.output_dir)
+            _write_outputs(project, outputs_to_write)
         _success(f"Rendered {len(outputs)} roles -> {target_name}")
 
 
-def _confirm_render_overwrite(project: Path, output_dir: str, outputs, interactive: bool):
+def _confirm_render_overwrite(project: Path, outputs, interactive: bool):
     """If interactive and some paths exist, prompt once. Return list to write (filtered or all)."""
-    out_dir_path = project / output_dir
-    existing = [o for o in outputs if (out_dir_path / o.path).exists()]
+    existing = [o for o in outputs if (project / o.path).exists()]
     if not existing or not interactive:
         return list(outputs)
     n = len(existing)
-    display_dir = output_dir if output_dir != "." else str(project)
-    if not typer.confirm(f"Overwrite {n} existing file(s) in {display_dir}?", default=True):
-        existing_paths = {(out_dir_path / o.path).resolve() for o in existing}
-        return [o for o in outputs if (out_dir_path / o.path).resolve() not in existing_paths]
+    if not typer.confirm(f"Overwrite {n} existing file(s) in {project}?", default=True):
+        existing_paths = {(project / o.path).resolve() for o in existing}
+        return [o for o in outputs if (project / o.path).resolve() not in existing_paths]
     return list(outputs)
 
 
-def _write_outputs(project: Path, outputs, output_dir: str) -> None:
+def _write_outputs(project: Path, outputs) -> None:
     for out in outputs:
-        full_path = (project / output_dir / out.path).resolve()
+        full_path = (project / out.path).resolve()
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(out.content, encoding="utf-8")
 
@@ -329,7 +299,7 @@ def _format_roles_dir_error(source: str, repo_path: Path) -> str:
     return (
         f"Fetched source '{source}', but no role definitions were found.\n"
         f"  cache: {repo_path}\n"
-        "  expected: a `roles.toml` with `project.roles_dir`, or a `roles/` directory"
+        "  expected: '.agents/roles/' or 'roles/' directory"
     )
 
 
@@ -396,6 +366,10 @@ def _copy_agents(plan: InstallPlan, yes: bool, include_overwrites: bool) -> list
         assert agent.source_path is not None
         destination = plan.install_dir / agent.install_relative_path()
         destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.resolve() == agent.source_path.resolve():
+            installed.append(agent)
+            logger.info(_bullet("skipped (same file)", agent.canonical_id))
+            continue
         shutil.copy2(agent.source_path, destination)
         installed.append(agent)
         logger.info(_bullet("installed", agent.canonical_id))
@@ -446,7 +420,13 @@ def _render_after_add(
         return
     # Global install: render into home so ~/.opencode/agents etc. are populated
     render_root = Path.home() if global_install else project
-    agents = _load_merged_agents(render_root)
+    scope: Scope = "user" if global_install else "project"
+    from role_forge.loader import load_agents_in_scope
+
+    _, agents = load_agents_in_scope(render_root, scope=scope)
+    if not agents:
+        _warn("No roles to render in installed scope.")
+        return
     _render_agents_to_targets(
         render_root,
         agents,

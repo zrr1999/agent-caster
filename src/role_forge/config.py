@@ -19,10 +19,7 @@ class ConfigError(Exception):
 
 def resolve_roles_dir(project: Path) -> Path:
     """Return the canonical roles directory for a project."""
-    config_path = find_config(project)
-    if config_path is None:
-        return project / ".agents" / "roles"
-    return project / load_config(config_path).roles_dir
+    return project / ".agents" / "roles"
 
 
 def find_config(project: Path) -> Path | None:
@@ -55,8 +52,6 @@ def _parse_target(name: str, raw: dict) -> TargetConfig:
     return TargetConfig(
         name=name,
         enabled=raw.get("enabled", True),
-        output_dir=raw.get("output_dir", "."),
-        output_layout=raw.get("output_layout"),
         model_map=raw.get("model_map", {}),
         capability_map=raw.get("capability_map", {}),
     )

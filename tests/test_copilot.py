@@ -6,7 +6,6 @@ from role_forge.models import AgentDef, ModelConfig, TargetConfig
 COPILOT_CONFIG = TargetConfig(
     name="copilot",
     enabled=True,
-    output_dir=".",
     model_map={},
     capability_map={},
 )

@@ -6,7 +6,6 @@ from role_forge.models import AgentDef, ModelConfig, TargetConfig
 CURSOR_CONFIG = TargetConfig(
     name="cursor",
     enabled=True,
-    output_dir=".",
     model_map={},
     capability_map={},
 )

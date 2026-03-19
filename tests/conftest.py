@@ -71,7 +71,6 @@ def opencode_config() -> TargetConfig:
     return TargetConfig(
         name="opencode",
         enabled=True,
-        output_dir=".",
         model_map={
             "reasoning": "github-copilot/claude-opus-4.6",
             "coding": "github-copilot/gpt-5.2-codex",
@@ -88,7 +87,6 @@ def claude_config() -> TargetConfig:
     return TargetConfig(
         name="claude",
         enabled=True,
-        output_dir=".",
         model_map={
             "reasoning": "opus",
             "coding": "sonnet",

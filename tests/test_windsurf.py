@@ -6,7 +6,6 @@ from role_forge.models import AgentDef, ModelConfig, TargetConfig
 WINDSURF_CONFIG = TargetConfig(
     name="windsurf",
     enabled=True,
-    output_dir=".",
     model_map={},
     capability_map={},
 )

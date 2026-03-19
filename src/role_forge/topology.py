@@ -5,8 +5,11 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from pathlib import PurePosixPath
+from typing import Literal
 
-from role_forge.models import AgentDef, TargetConfig
+from role_forge.models import AgentDef
+
+OutputLayout = Literal["preserve", "namespace", "flatten"]
 
 _LEVEL_RE = re.compile(r"[Ll]?(\d+)$")
 
@@ -72,15 +75,15 @@ def validate_agents(agents: list[AgentDef]) -> dict[str, list[AgentDef]]:
     return graph
 
 
-def validate_output_layout(agents: list[AgentDef], config: TargetConfig) -> None:
+def validate_output_layout(agents: list[AgentDef], layout: OutputLayout) -> None:
     """Ensure the selected output layout produces unique target identifiers."""
     seen: dict[str, str] = {}
     for agent in agents:
-        output_id = agent.output_id(config.output_layout)
+        output_id = agent.output_id(layout)
         existing = seen.get(output_id)
         if existing is not None:
             raise TopologyError(
-                f"Output layout '{config.output_layout}' maps both '{existing}' and "
+                f"Output layout '{layout}' maps both '{existing}' and "
                 f"'{agent.canonical_id}' to '{output_id}'"
             )
         seen[output_id] = agent.canonical_id
@@ -106,14 +109,14 @@ def resolve_allowed_children(
     return _resolve_refs(agent.hierarchy.allowed_children, by_id=by_id, by_name=by_name)
 
 
-def build_output_path(agent: AgentDef, *, base_dir: str, suffix: str, config: TargetConfig) -> str:
+def build_output_path(agent: AgentDef, *, base_dir: str, suffix: str, layout: OutputLayout) -> str:
     """Return the target output path for an agent under the selected layout."""
     base_path = PurePosixPath(base_dir)
     if base_path.is_absolute() or ".." in base_path.parts:
         raise TopologyError(f"Output base directory '{base_dir}' escapes base directory bounds")
 
-    output_id = agent.output_id(config.output_layout)
-    if config.output_layout in ("preserve", None):
+    output_id = agent.output_id(layout)
+    if layout == "preserve":
         return f"{base_dir}/{output_id}{suffix}"
     return f"{base_dir}/{PurePosixPath(output_id).name}{suffix}"
 

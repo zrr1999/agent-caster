@@ -221,7 +221,7 @@ def test_find_roles_dir_ignores_agents_dir_alias(tmp_path):
     agents = tmp_path / "my-agents"
     agents.mkdir()
 
-    with pytest.raises(FileNotFoundError, match=r"Expected 'roles\.toml' with roles_dir"):
+    with pytest.raises(FileNotFoundError, match=r"No agent definitions found"):
         find_roles_dir(tmp_path)
 
 
