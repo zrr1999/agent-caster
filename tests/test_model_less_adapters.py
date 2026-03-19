@@ -20,7 +20,6 @@ def _config(name: str) -> TargetConfig:
     return TargetConfig(
         name=name,
         enabled=True,
-        output_dir=".",
         model_map={},
         capability_map={},
     )

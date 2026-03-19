@@ -194,12 +194,11 @@ def test_cast_nested_agent_uses_namespace_layout_by_default(claude_config):
     assert outputs[0].path == ".claude/agents/l2__scout.md"
 
 
-def test_cast_namespace_layout_uses_name_based_delegate_ids() -> None:
-    """Claude resolves Task() by agent name, regardless of output layout."""
+def test_cast_namespace_layout_uses_canonical_id_delegate_ids() -> None:
+    """Claude resolves Task() by agent canonical_id for uniqueness across namespaces."""
     adapter = ClaudeAdapter()
     config = TargetConfig(
         name="claude",
-        output_layout="namespace",
         model_map={"reasoning": "opus", "coding": "sonnet"},
     )
     agents = [
@@ -220,15 +219,16 @@ def test_cast_namespace_layout_uses_name_based_delegate_ids() -> None:
     outputs = adapter.cast(agents, config)
     by_path = {output.path: output.content for output in outputs}
     assert ".claude/agents/l1__orchestrator.md" in by_path
-    assert "Task(worker)" in by_path[".claude/agents/l1__orchestrator.md"]
+    content = by_path[".claude/agents/l1__orchestrator.md"]
+    assert "Task(l3/worker)" in content
+    assert "name: l1/orchestrator" in content
 
 
-def test_cast_preserve_layout_uses_name_based_delegate_ids() -> None:
-    """Claude resolves Task() by agent name even with nested file paths."""
+def test_cast_nested_delegates_use_canonical_id() -> None:
+    """Claude uses canonical_id for Task() refs with nested agents in same namespace."""
     adapter = ClaudeAdapter()
     config = TargetConfig(
         name="claude",
-        output_layout="preserve",
         model_map={"reasoning": "opus", "coding": "sonnet"},
     )
     agents = [
@@ -248,8 +248,7 @@ def test_cast_preserve_layout_uses_name_based_delegate_ids() -> None:
 
     outputs = adapter.cast(agents, config)
     by_path = {output.path: output.content for output in outputs}
-    assert ".claude/agents/directors/coordinator.md" in by_path
-    content = by_path[".claude/agents/directors/coordinator.md"]
-    assert "Task(precision-alignment)" in content
-    # Must NOT contain path-based reference
-    assert "Task(directors/precision-alignment)" not in content
+    assert ".claude/agents/directors__coordinator.md" in by_path
+    content = by_path[".claude/agents/directors__coordinator.md"]
+    assert "Task(directors/precision-alignment)" in content
+    assert "name: directors/coordinator" in content

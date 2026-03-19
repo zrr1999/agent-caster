@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from role_forge.models import AgentDef, ModelConfig, OutputFile, TargetConfig
 from role_forge.topology import build_output_path, validate_agents, validate_output_layout
+
+OutputLayout = Literal["preserve", "namespace", "flatten"]
 
 
 class BaseAdapter(ABC):
@@ -16,26 +18,15 @@ class BaseAdapter(ABC):
     base_dir: ClassVar[str]
     file_suffix: ClassVar[str]
     default_model_map: ClassVar[dict[str, str]] = {}
-    default_output_layout: ClassVar[str] = "preserve"
+    default_output_layout: ClassVar[OutputLayout] = "preserve"
     requires_model_map: ClassVar[bool] = True
     prompt_separator: ClassVar[str] = "\n"
 
-    def _effective_config(self, config: TargetConfig) -> TargetConfig:
-        """Apply adapter defaults to the target configuration.
-
-        When the caller has not explicitly set ``output_layout`` (i.e. it is
-        ``None``), the adapter's own ``default_output_layout`` takes
-        precedence.
-        """
-        if config.output_layout is None:
-            return config.model_copy(update={"output_layout": self.default_output_layout})
-        return config
-
     def cast(self, agents: list[AgentDef], config: TargetConfig) -> list[OutputFile]:
         """Validate topology and render all agents for the target platform."""
-        config = self._effective_config(config)
+        layout = self.default_output_layout
         delegation_graph = validate_agents(agents)
-        validate_output_layout(agents, config)
+        validate_output_layout(agents, layout)
 
         outputs: list[OutputFile] = []
         for agent in agents:
@@ -49,7 +40,7 @@ class BaseAdapter(ABC):
                         agent,
                         base_dir=self.base_dir,
                         suffix=self.file_suffix,
-                        config=config,
+                        layout=layout,
                     ),
                     content=self.render_agent(agent, config, delegates),
                 )
@@ -62,7 +53,7 @@ class BaseAdapter(ABC):
         Override in subclasses when the target platform resolves agents by
         name rather than by output path.
         """
-        return target.output_id(config.output_layout)
+        return target.output_id(self.default_output_layout)
 
     @staticmethod
     def _resolve_model(model: ModelConfig, model_map: dict[str, str]) -> str:

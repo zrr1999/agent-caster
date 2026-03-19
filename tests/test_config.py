@@ -13,7 +13,6 @@ from role_forge.config import (
 
 def test_load_config_from_fixtures(fixtures_dir):
     config = load_config(fixtures_dir / "roles.toml")
-    assert config.roles_dir == ".agents/roles"
     assert "opencode" in config.targets
     assert "claude" in config.targets
 
@@ -22,8 +21,6 @@ def test_opencode_target_config(fixtures_dir):
     config = load_config(fixtures_dir / "roles.toml")
     oc = config.targets["opencode"]
     assert oc.enabled is True
-    assert oc.output_dir == "."
-    assert oc.output_layout is None
     assert oc.model_map["reasoning"] == "github-copilot/claude-opus-4.6"
     assert oc.model_map["coding"] == "github-copilot/gpt-5.2-codex"
 
@@ -59,45 +56,8 @@ def test_find_config_returns_none_when_absent(tmp_path):
     assert find_config(tmp_path) is None
 
 
-def test_target_output_layout_parsed(tmp_path):
-    config_path = tmp_path / CONFIG_FILENAME
-    config_path.write_text(
-        "[targets.claude]\n"
-        'output_layout = "namespace"\n'
-        "[targets.claude.model_map]\n"
-        'reasoning = "opus"\n'
-        'coding = "sonnet"\n'
-    )
-
-    config = load_config(config_path)
-    assert config.targets["claude"].output_layout == "namespace"
-
-
-def test_roles_dir_ignores_agents_dir_when_both_present(tmp_path):
-    config_path = tmp_path / CONFIG_FILENAME
-    config_path.write_text('[project]\nroles_dir = "roles"\nagents_dir = ".agents/roles"\n')
-
-    config = load_config(config_path)
-    assert config.roles_dir == "roles"
-
-
-def test_agents_dir_no_longer_supported(tmp_path):
-    config_path = tmp_path / CONFIG_FILENAME
-    config_path.write_text('[project]\nagents_dir = "roles"\n')
-
-    config = load_config(config_path)
-    assert config.roles_dir == ".agents/roles"
-
-
 def test_resolve_roles_dir_defaults_when_config_absent(tmp_path):
     assert resolve_roles_dir(tmp_path) == tmp_path / ".agents" / "roles"
-
-
-def test_resolve_roles_dir_uses_roles_toml(tmp_path):
-    config_path = tmp_path / CONFIG_FILENAME
-    config_path.write_text('[project]\nroles_dir = "roles"\n')
-
-    assert resolve_roles_dir(tmp_path) == tmp_path / "roles"
 
 
 def test_user_roles_dir_constant_matches_home() -> None:

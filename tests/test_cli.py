@@ -377,9 +377,7 @@ def test_render_cursor_respects_target_config_without_model_map(tmp_path):
     roles_dir = tmp_path / ".agents" / "roles"
     roles_dir.mkdir(parents=True)
     (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
-    (tmp_path / "roles.toml").write_text(
-        '[targets.cursor]\noutput_dir = "generated"\noutput_layout = "flatten"\n'
-    )
+    (tmp_path / "roles.toml").write_text("[targets.cursor]\nenabled = true\n")
 
     result = runner.invoke(
         app,
@@ -387,7 +385,7 @@ def test_render_cursor_respects_target_config_without_model_map(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    agent_file = tmp_path / "generated" / ".cursor" / "agents" / "explorer.mdc"
+    agent_file = tmp_path / ".cursor" / "agents" / "explorer.mdc"
     assert agent_file.is_file()
     assert "model:" not in agent_file.read_text()
 
@@ -424,67 +422,6 @@ def test_render_fails_when_any_installed_role_is_invalid(tmp_path):
     assert result.exit_code == 1
     assert "bad.md" in result.output
     assert not (tmp_path / ".claude" / "agents" / "good.md").exists()
-
-
-def test_render_rejects_output_dir_outside_project(tmp_path):
-    roles_dir = tmp_path / ".agents" / "roles"
-    roles_dir.mkdir(parents=True)
-    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
-    (tmp_path / "roles.toml").write_text(
-        "[targets.claude]\n"
-        'output_dir = "../outside"\n'
-        "[targets.claude.model_map]\n"
-        'reasoning = "opus"\n'
-    )
-
-    result = runner.invoke(
-        app,
-        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
-    )
-
-    assert result.exit_code == 1
-    assert "outside the project" in result.output
-    assert not (tmp_path / ".claude" / "agents" / "explorer.md").exists()
-    assert not (tmp_path.parent / "outside").exists()
-
-
-def test_render_rejects_absolute_output_dir(tmp_path):
-    roles_dir = tmp_path / ".agents" / "roles"
-    roles_dir.mkdir(parents=True)
-    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
-    outside = tmp_path / "absolute-output"
-    (tmp_path / "roles.toml").write_text(
-        "[targets.claude]\n"
-        f'output_dir = "{outside}"\n'
-        "[targets.claude.model_map]\n"
-        'reasoning = "opus"\n'
-    )
-
-    result = runner.invoke(
-        app,
-        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
-    )
-
-    assert result.exit_code == 1
-    assert "project-relative" in result.output
-    assert not outside.exists()
-
-
-def test_render_allows_normalized_output_dir_inside_project(tmp_path):
-    roles_dir = tmp_path / ".agents" / "roles"
-    roles_dir.mkdir(parents=True)
-    (roles_dir / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
-    (tmp_path / "roles.toml").write_text(
-        '[targets.cursor]\noutput_dir = "generated/../generated-safe"\n'
-    )
-
-    result = runner.invoke(
-        app,
-        ["render", "--target", "cursor", "--project-dir", str(tmp_path)],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert (tmp_path / "generated-safe" / ".cursor" / "agents" / "explorer.mdc").is_file()
 
 
 def test_render_merges_user_and_project_agents(tmp_path, monkeypatch):
@@ -696,7 +633,7 @@ def test_remove_nonexistent(tmp_path):
 
 def test_render_uses_roles_toml_targets_without_flag(tmp_path):
     """render without --target should use targets from roles.toml, not filesystem detection."""
-    roles_dir = tmp_path / "roles"
+    roles_dir = tmp_path / ".agents" / "roles"
     roles_dir.mkdir(parents=True)
     (roles_dir / "explorer.md").write_text(
         "---\nname: explorer\ndescription: Explorer\nrole: subagent\n"
@@ -709,7 +646,6 @@ def test_render_uses_roles_toml_targets_without_flag(tmp_path):
 
     # But only configure opencode and claude in roles.toml
     (tmp_path / "roles.toml").write_text(
-        '[project]\nroles_dir = "roles"\n'
         "[targets.opencode]\n"
         "enabled = true\n"
         "[targets.opencode.model_map]\n"
@@ -750,7 +686,7 @@ def test_add_missing_roles_dir_message_is_actionable(monkeypatch, tmp_path):
         "Fetched source 'PFCCLab/precision-agents', but no role definitions were found"
         in result.output
     )
-    assert "expected: a `roles.toml`" in result.output
+    assert "'.agents/roles/' or 'roles/' directory" in result.output
 
 
 def test_update_global_passes_scope(monkeypatch, tmp_path):
@@ -970,11 +906,7 @@ def test_render_namespace_layout_avoids_nested_name_collisions(tmp_path):
         "---\nname: worker\ndescription: L3 worker\n---\n# L3 Worker\n"
     )
     (tmp_path / "roles.toml").write_text(
-        "[targets.claude]\n"
-        'output_layout = "namespace"\n'
-        "[targets.claude.model_map]\n"
-        'reasoning = "opus"\n'
-        'coding = "sonnet"\n'
+        '[targets.claude]\n[targets.claude.model_map]\nreasoning = "opus"\ncoding = "sonnet"\n'
     )
 
     result = runner.invoke(
@@ -984,28 +916,6 @@ def test_render_namespace_layout_avoids_nested_name_collisions(tmp_path):
     assert result.exit_code == 0, result.output
     assert (tmp_path / ".claude" / "agents" / "l2__worker.md").is_file()
     assert (tmp_path / ".claude" / "agents" / "l3__worker.md").is_file()
-
-
-def test_render_flatten_layout_rejects_nested_name_collisions(tmp_path):
-    roles_dir = tmp_path / ".agents" / "roles"
-    (roles_dir / "l2").mkdir(parents=True)
-    (roles_dir / "l3").mkdir(parents=True)
-    (roles_dir / "l2" / "worker.md").write_text("---\nname: worker\n---\n# L2 Worker\n")
-    (roles_dir / "l3" / "worker.md").write_text("---\nname: worker\n---\n# L3 Worker\n")
-    (tmp_path / "roles.toml").write_text(
-        "[targets.claude]\n"
-        'output_layout = "flatten"\n'
-        "[targets.claude.model_map]\n"
-        'reasoning = "opus"\n'
-        'coding = "sonnet"\n'
-    )
-
-    result = runner.invoke(
-        app,
-        ["render", "--target", "claude", "--project-dir", str(tmp_path)],
-    )
-    assert result.exit_code == 1
-    assert "maps both" in result.output
 
 
 def test_add_opencode_uses_source_repo_model_map(tmp_path):
@@ -1051,11 +961,7 @@ def test_add_cursor_uses_source_repo_target_config_without_model_map(tmp_path):
     roles = source / "roles"
     roles.mkdir(parents=True)
     (source / "roles.toml").write_text(
-        "[project]\n"
-        'roles_dir = "roles"\n\n'
-        "[targets.cursor]\n"
-        "enabled = true\n"
-        'output_dir = "generated"\n'
+        '[project]\nroles_dir = "roles"\n\n[targets.cursor]\nenabled = true\n'
     )
     (roles / "explorer.md").write_text("---\nname: explorer\n---\n# Explorer\n")
 
@@ -1068,7 +974,7 @@ def test_add_cursor_uses_source_repo_target_config_without_model_map(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    agent_file = project / "generated" / ".cursor" / "agents" / "explorer.mdc"
+    agent_file = project / ".cursor" / "agents" / "explorer.mdc"
     assert agent_file.is_file()
     assert "model:" not in agent_file.read_text()
 

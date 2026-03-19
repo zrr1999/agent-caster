@@ -43,7 +43,7 @@ class ClaudeAdapter(BaseAdapter):
 
     def _delegate_ref(self, target: AgentDef, config: TargetConfig) -> str:
         """Claude Code resolves Task() targets by the agent's name: field."""
-        return target.name
+        return target.canonical_id
 
     def _expand_capabilities(
         self,
@@ -107,7 +107,7 @@ class ClaudeAdapter(BaseAdapter):
         tools = self._map_tool_ids(spec)
         bash_patterns = list(spec.bash_patterns)
 
-        name = agent.name
+        name = agent.canonical_id
         description = agent.description
         model = self._resolve_model(agent.model, config.model_map)
         allowed_tools = self._build_allowed_tools(tools, bash_patterns, delegates)
