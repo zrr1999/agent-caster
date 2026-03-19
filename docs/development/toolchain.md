@@ -11,7 +11,7 @@ just format
 just lint
 just check
 just test
-just docs-build
+uv run zensical build
 just ci
 ```
 

@@ -10,7 +10,7 @@ It runs:
 
 ```bash
 uv sync --dev
-just docs-build
+uv run zensical build
 ```
 
 ## Vercel
@@ -58,7 +58,7 @@ If Vercel asks for project settings, use:
 ## Local verification
 
 ```bash
-just docs-build
+uv run zensical build
 ```
 
 That generates the static site into `site/`, which matches the Vercel output directory.
