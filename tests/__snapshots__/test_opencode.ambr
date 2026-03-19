@@ -78,7 +78,7 @@
     ''',
     'feature-lead.md': '''
       ---
-      description: Nested lead fixture that exercises the `all` capability.
+      description: "Nested lead fixture that exercises the `all` capability."
       mode: subagent
       model: github-copilot/gpt-5.2-codex
       temperature: 0.1
