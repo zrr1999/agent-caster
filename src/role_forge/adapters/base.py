@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 from role_forge.models import AgentDef, ModelConfig, OutputFile, TargetConfig
-from role_forge.topology import build_output_path, validate_agents, validate_output_layout
-
-OutputLayout = Literal["preserve", "namespace", "flatten"]
+from role_forge.topology import (
+    OutputLayout,
+    build_output_path,
+    validate_agents,
+    validate_output_layout,
+)
 
 
 class BaseAdapter(ABC):

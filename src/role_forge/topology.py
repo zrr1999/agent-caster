@@ -5,8 +5,11 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from pathlib import PurePosixPath
+from typing import Literal
 
 from role_forge.models import AgentDef
+
+OutputLayout = Literal["preserve", "namespace", "flatten"]
 
 _LEVEL_RE = re.compile(r"[Ll]?(\d+)$")
 
@@ -72,7 +75,7 @@ def validate_agents(agents: list[AgentDef]) -> dict[str, list[AgentDef]]:
     return graph
 
 
-def validate_output_layout(agents: list[AgentDef], layout: str) -> None:
+def validate_output_layout(agents: list[AgentDef], layout: OutputLayout) -> None:
     """Ensure the selected output layout produces unique target identifiers."""
     seen: dict[str, str] = {}
     for agent in agents:
@@ -106,7 +109,7 @@ def resolve_allowed_children(
     return _resolve_refs(agent.hierarchy.allowed_children, by_id=by_id, by_name=by_name)
 
 
-def build_output_path(agent: AgentDef, *, base_dir: str, suffix: str, layout: str) -> str:
+def build_output_path(agent: AgentDef, *, base_dir: str, suffix: str, layout: OutputLayout) -> str:
     """Return the target output path for an agent under the selected layout."""
     base_path = PurePosixPath(base_dir)
     if base_path.is_absolute() or ".." in base_path.parts:
