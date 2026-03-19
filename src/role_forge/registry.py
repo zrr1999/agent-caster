@@ -204,12 +204,13 @@ def _ensure_head_checked_out(repo_dir: Path, ref: str | None) -> None:
 
 
 def find_roles_dir(repo_path: Path) -> Path:
-    """Find agent definitions directory in a fetched source repo.
+    """Find the **source** roles directory in a repo.
+
+    `.agents/roles/` is the *install* target (generated/copied), never source.
 
     Priority:
-    1. roles.toml [project].roles_dir setting
-    2. .agents/roles/ directory (default install layout)
-    3. roles/ directory (legacy/simple layout)
+    1. roles.toml ``[project].roles_dir`` setting
+    2. ``roles/`` directory (standard source layout)
     """
     config_path = find_config(repo_path)
     if config_path is not None:
@@ -217,16 +218,11 @@ def find_roles_dir(repo_path: Path) -> Path:
         if roles_dir.is_dir():
             return roles_dir
 
-    roles_dir = repo_path / ".agents" / "roles"
-    if roles_dir.is_dir():
-        return roles_dir
-
-    # Legacy fallback
     roles_dir = repo_path / "roles"
     if roles_dir.is_dir():
         return roles_dir
 
     raise FileNotFoundError(
         f"No agent definitions found in {repo_path}. "
-        "Expected '.agents/roles/' or 'roles/' directory."
+        "Expected 'roles/' directory or [project].roles_dir in roles.toml."
     )
