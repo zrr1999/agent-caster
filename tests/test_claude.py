@@ -187,11 +187,11 @@ def test_expand_capabilities_returns_canonical_spec(claude_config):
     )
 
 
-def test_cast_nested_agent_uses_namespace_layout_by_default(claude_config):
+def test_cast_nested_agent_preserves_directory_structure(claude_config):
     agent = AgentDef(name="scout", description="Scout", relative_path="l2/scout.md")
     adapter = ClaudeAdapter()
     outputs = adapter.cast([agent], claude_config)
-    assert outputs[0].path == ".claude/agents/l2__scout.md"
+    assert outputs[0].path == ".claude/agents/l2/scout.md"
 
 
 def test_cast_namespace_layout_uses_canonical_id_delegate_ids() -> None:
@@ -218,8 +218,8 @@ def test_cast_namespace_layout_uses_canonical_id_delegate_ids() -> None:
 
     outputs = adapter.cast(agents, config)
     by_path = {output.path: output.content for output in outputs}
-    assert ".claude/agents/l1__orchestrator.md" in by_path
-    content = by_path[".claude/agents/l1__orchestrator.md"]
+    assert ".claude/agents/l1/orchestrator.md" in by_path
+    content = by_path[".claude/agents/l1/orchestrator.md"]
     assert "Task(l3/worker)" in content
     assert "name: l1/orchestrator" in content
 
@@ -248,7 +248,7 @@ def test_cast_nested_delegates_use_canonical_id() -> None:
 
     outputs = adapter.cast(agents, config)
     by_path = {output.path: output.content for output in outputs}
-    assert ".claude/agents/directors__coordinator.md" in by_path
-    content = by_path[".claude/agents/directors__coordinator.md"]
+    assert ".claude/agents/directors/coordinator.md" in by_path
+    content = by_path[".claude/agents/directors/coordinator.md"]
     assert "Task(directors/precision-alignment)" in content
     assert "name: directors/coordinator" in content

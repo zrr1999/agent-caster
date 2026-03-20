@@ -35,17 +35,6 @@ bench:
 pre-commit:
     uvx prek run --all-files
 
-# Preview documentation locally
-docs-serve:
-    uv run zensical serve
-
-# Build documentation site
-docs-build:
-    uv run zensical build
-
-# Verify documentation can build
-docs-check: docs-build
-
 # Full CI check (format + check + test)
 ci: pre-commit format check test
 

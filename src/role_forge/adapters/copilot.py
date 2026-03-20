@@ -28,7 +28,7 @@ Notes:
 
 from __future__ import annotations
 
-from role_forge.adapters.base import BaseAdapter
+from role_forge.adapters.base import BaseAdapter, _yaml_quote
 from role_forge.models import AgentDef, TargetConfig
 
 
@@ -43,7 +43,7 @@ class CopilotAdapter(BaseAdapter):
         """Emit Copilot agent frontmatter."""
         lines = ["---"]
         if description:
-            lines.append(f"description: {description}")
+            lines.append(f"description: {_yaml_quote(description)}")
         lines.append("---")
         return "\n".join(lines)
 

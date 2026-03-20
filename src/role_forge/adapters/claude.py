@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from role_forge.adapters.base import BaseAdapter
+from role_forge.adapters.base import BaseAdapter, _yaml_quote
 from role_forge.capabilities import CapabilitySpec, expand_capabilities
 from role_forge.groups import ALL_TOOL_IDS
 from role_forge.models import AgentDef, TargetConfig
@@ -35,7 +35,7 @@ class ClaudeAdapter(BaseAdapter):
     name = "claude"
     base_dir = ".claude/agents"
     file_suffix = ".md"
-    default_output_layout = "namespace"
+    default_output_layout = "preserve"
     default_model_map: ClassVar[dict[str, str]] = {
         "reasoning": "claude-opus-4-6",
         "coding": "claude-sonnet-4",
@@ -87,8 +87,8 @@ class ClaudeAdapter(BaseAdapter):
         tools: list[str],
     ) -> str:
         lines = ["---"]
-        lines.append(f"name: {name}")
-        lines.append(f"description: {description}")
+        lines.append(f"name: {_yaml_quote(name)}")
+        lines.append(f"description: {_yaml_quote(description)}")
 
         if tools:
             lines.append(f"tools: {', '.join(tools)}")

@@ -13,6 +13,18 @@ from role_forge.topology import (
     validate_output_layout,
 )
 
+_YAML_UNSAFE = frozenset(":#{}[]|>&*!%@`")
+
+
+def _yaml_quote(value: str) -> str:
+    """Quote a YAML scalar if it contains special characters."""
+    if not value:
+        return '""'
+    if any(ch in value for ch in _YAML_UNSAFE):
+        escaped = value.replace('"', '\\"')
+        return f'"{escaped}"'
+    return value
+
 
 class BaseAdapter(ABC):
     """Base class for platform adapters."""

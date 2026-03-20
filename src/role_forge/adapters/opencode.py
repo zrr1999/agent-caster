@@ -5,7 +5,7 @@ Migrated from precision-alignment-agent/adapters/opencode/generate.py.
 
 from __future__ import annotations
 
-from role_forge.adapters.base import BaseAdapter
+from role_forge.adapters.base import BaseAdapter, _yaml_quote
 from role_forge.capabilities import CapabilitySpec, expand_capabilities
 from role_forge.models import AgentDef, TargetConfig
 
@@ -88,7 +88,7 @@ class OpenCodeAdapter(BaseAdapter):
     ) -> str:
         """Custom YAML serializer matching OpenCode's expected format."""
         lines = ["---"]
-        lines.append(f"description: {description}")
+        lines.append(f"description: {_yaml_quote(description)}")
         lines.append(f"mode: {mode}")
         lines.append(f"model: {model}")
         lines.append(f"temperature: {temperature}")

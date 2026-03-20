@@ -274,8 +274,8 @@ def test_add_preserves_nested_role_paths_and_cast_output(tmp_path):
     assert result.exit_code == 0, result.output
     assert (project / ".agents" / "roles" / "l2" / "lead.md").is_file()
     assert (project / ".agents" / "roles" / "l3" / "worker.md").is_file()
-    assert (project / ".claude" / "agents" / "l2__lead.md").is_file()
-    assert (project / ".claude" / "agents" / "l3__worker.md").is_file()
+    assert (project / ".claude" / "agents" / "l2" / "lead.md").is_file()
+    assert (project / ".claude" / "agents" / "l3" / "worker.md").is_file()
 
 
 # -- list command --------------------------------------------------------------
@@ -686,7 +686,7 @@ def test_add_missing_roles_dir_message_is_actionable(monkeypatch, tmp_path):
         "Fetched source 'PFCCLab/precision-agents', but no role definitions were found"
         in result.output
     )
-    assert "'.agents/roles/' or 'roles/' directory" in result.output
+    assert "'roles/' directory or [project].roles_dir in roles.toml" in result.output
 
 
 def test_update_global_passes_scope(monkeypatch, tmp_path):
@@ -914,8 +914,8 @@ def test_render_namespace_layout_avoids_nested_name_collisions(tmp_path):
         ["render", "--target", "claude", "--project-dir", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
-    assert (tmp_path / ".claude" / "agents" / "l2__worker.md").is_file()
-    assert (tmp_path / ".claude" / "agents" / "l3__worker.md").is_file()
+    assert (tmp_path / ".claude" / "agents" / "l2" / "worker.md").is_file()
+    assert (tmp_path / ".claude" / "agents" / "l3" / "worker.md").is_file()
 
 
 def test_add_opencode_uses_source_repo_model_map(tmp_path):

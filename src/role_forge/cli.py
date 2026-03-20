@@ -299,7 +299,7 @@ def _format_roles_dir_error(source: str, repo_path: Path) -> str:
     return (
         f"Fetched source '{source}', but no role definitions were found.\n"
         f"  cache: {repo_path}\n"
-        "  expected: '.agents/roles/' or 'roles/' directory"
+        "  expected: 'roles/' directory or [project].roles_dir in roles.toml"
     )
 
 

@@ -34,7 +34,7 @@ Notes:
 
 from __future__ import annotations
 
-from role_forge.adapters.base import BaseAdapter
+from role_forge.adapters.base import BaseAdapter, _yaml_quote
 from role_forge.models import AgentDef, TargetConfig
 
 TRIGGER = "model_decision"
@@ -50,7 +50,7 @@ class WindsurfAdapter(BaseAdapter):
         """Emit Windsurf rule frontmatter."""
         lines = ["---", f"trigger: {TRIGGER}"]
         if description:
-            lines.append(f"description: {description}")
+            lines.append(f"description: {_yaml_quote(description)}")
         lines.append("---")
         return "\n".join(lines)
 

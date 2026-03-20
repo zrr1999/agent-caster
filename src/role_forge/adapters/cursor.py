@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from role_forge.adapters.base import BaseAdapter
+from role_forge.adapters.base import BaseAdapter, _yaml_quote
 from role_forge.models import AgentDef, TargetConfig
 
 
@@ -39,9 +39,9 @@ class CursorAdapter(BaseAdapter):
     def _serialize_frontmatter(self, name: str, description: str) -> str:
         """Emit minimal Cursor MDC frontmatter."""
         lines = ["---"]
-        lines.append(f"name: {name}")
+        lines.append(f"name: {_yaml_quote(name)}")
         if description:
-            lines.append(f"description: {description}")
+            lines.append(f"description: {_yaml_quote(description)}")
         lines.append("---")
         return "\n".join(lines)
 
