@@ -37,7 +37,7 @@ def load_config(config_path: Path) -> ProjectConfig:
         data = tomllib.load(f)
 
     project = data.get("project", {})
-    roles_dir = project.get("roles_dir", ".agents/roles")
+    roles_dir = project.get("roles_dir", "roles")
 
     raw_targets = data.get("targets", {})
     targets = {}
