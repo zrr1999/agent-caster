@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from role_forge.adapters.copilot import CopilotAdapter
 from role_forge.adapters.cursor import CursorAdapter
 from role_forge.adapters.windsurf import WindsurfAdapter
 from role_forge.models import AgentDef, TargetConfig
 
 ADAPTER_CASES = [
-    pytest.param(CopilotAdapter, "copilot", ".github/agents", ".md", id="copilot"),
     pytest.param(CursorAdapter, "cursor", ".cursor/agents", ".mdc", id="cursor"),
     pytest.param(WindsurfAdapter, "windsurf", ".windsurf/rules", ".md", id="windsurf"),
 ]
