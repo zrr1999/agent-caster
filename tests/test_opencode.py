@@ -63,7 +63,7 @@ def test_cast_all_fixtures(fixtures_dir, opencode_config, snapshot):
     """Cast all fixture agents and verify output count and content."""
     from role_forge.loader import load_agents
 
-    agents = load_agents(fixtures_dir / ".agents" / "roles")
+    agents = load_agents(fixtures_dir / "roles")
     adapter = OpenCodeAdapter()
     outputs = adapter.cast(agents, opencode_config)
     assert len(outputs) == 8

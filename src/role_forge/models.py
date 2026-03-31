@@ -80,7 +80,7 @@ class AgentDef(BaseModel, frozen=True):
         return self.canonical_id
 
     def install_relative_path(self) -> str:
-        """Canonical install path beneath `.agents/roles`."""
+        """Canonical relative path within the source role tree."""
         if self.relative_path:
             return self.relative_path
         return f"{self.name}.md"
@@ -113,7 +113,7 @@ class ProjectConfig(BaseModel, frozen=True):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    roles_dir: str = Field(default=".agents/roles", alias="roles_dir")
+    roles_dir: str = Field(default="roles", alias="roles_dir")
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
 
 

@@ -8,9 +8,9 @@ Different coding tools want different agent formats. `role-forge` keeps one cano
 
 ## What it does
 
-- installs reusable role definitions from GitHub repos or local paths
-- stores a canonical source tree in `.agents/roles/`
-- renders that source into Claude Code, OpenCode, Cursor, and Windsurf formats
+- fetches reusable role definitions from GitHub repos or local paths
+- keeps project-authored canonical roles in `roles/` and fetched repos in the global repo cache
+- generates Claude Code, OpenCode, Cursor, and Windsurf files directly from source repos or repo cache
 - validates hierarchy, delegation rules, and output layout collisions before writing files
 - lets third-party adapters extend the render pipeline through entry points
 

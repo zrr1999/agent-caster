@@ -8,7 +8,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from role_forge.config import find_config, load_config
+from role_forge.config import resolve_source_roles_dir
 
 
 @dataclass
@@ -67,7 +67,8 @@ def parse_source(source: str) -> ParsedSource:
     return ParsedSource(org=parts[0], repo=parts[1], ref=ref)
 
 
-CACHE_DIR = Path.home() / ".config" / "role-forge" / "repos"
+CACHE_ROOT = Path.home() / ".config" / "role-forge"
+CACHE_DIR = CACHE_ROOT / "repos"
 
 
 def fetch_source(source: ParsedSource, cache_root: Path | None = None) -> Path:
@@ -90,6 +91,25 @@ def fetch_source(source: ParsedSource, cache_root: Path | None = None) -> Path:
         _git_clone(source.github_url, cache, source.ref)
 
     return cache
+
+
+def cache_path_for_source(source: ParsedSource, cache_root: Path | None = None) -> Path:
+    """Return the cache path for a parsed remote source."""
+    if source.is_local:
+        raise ValueError("Local sources do not use the repo cache.")
+    return (cache_root or CACHE_DIR) / source.cache_key
+
+
+def read_head_commit(repo_dir: Path) -> str:
+    """Return the current HEAD commit for a fetched repo."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def _git_clone(url: str, dest: Path, ref: str | None) -> None:
@@ -206,19 +226,11 @@ def _ensure_head_checked_out(repo_dir: Path, ref: str | None) -> None:
 def find_roles_dir(repo_path: Path) -> Path:
     """Find the **source** roles directory in a repo.
 
-    `.agents/roles/` is the *install* target (generated/copied), never source.
-
     Priority:
     1. roles.toml ``[project].roles_dir`` setting
     2. ``roles/`` directory (standard source layout)
     """
-    config_path = find_config(repo_path)
-    if config_path is not None:
-        roles_dir = repo_path / load_config(config_path).roles_dir
-        if roles_dir.is_dir():
-            return roles_dir
-
-    roles_dir = repo_path / "roles"
+    roles_dir = resolve_source_roles_dir(repo_path)
     if roles_dir.is_dir():
         return roles_dir
 
