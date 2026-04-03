@@ -10,16 +10,26 @@ from loguru import logger
 from role_forge.models import ProjectConfig, TargetConfig
 
 CONFIG_FILENAME = "roles.toml"
-USER_ROLES_DIR = Path.home() / ".agents" / "roles"
+DEFAULT_SOURCE_ROLES_DIR = "roles"
+PROJECT_STATE_DIR = Path(".role-forge")
+OUTPUT_MANIFEST_FILENAME = "outputs.json"
 
 
 class ConfigError(Exception):
     """Raised when roles.toml is invalid or missing."""
 
 
-def resolve_roles_dir(project: Path) -> Path:
-    """Return the canonical roles directory for a project."""
-    return project / ".agents" / "roles"
+def resolve_source_roles_dir(project: Path) -> Path:
+    """Return the canonical source roles directory for a project."""
+    config_path = find_config(project)
+    if config_path is None:
+        return project / DEFAULT_SOURCE_ROLES_DIR
+    return project / load_config(config_path).roles_dir
+
+
+def resolve_output_manifest_path(project: Path) -> Path:
+    """Return the local project output manifest path."""
+    return project / PROJECT_STATE_DIR / OUTPUT_MANIFEST_FILENAME
 
 
 def find_config(project: Path) -> Path | None:
@@ -37,7 +47,7 @@ def load_config(config_path: Path) -> ProjectConfig:
         data = tomllib.load(f)
 
     project = data.get("project", {})
-    roles_dir = project.get("roles_dir", "roles")
+    roles_dir = project.get("roles_dir", DEFAULT_SOURCE_ROLES_DIR)
 
     raw_targets = data.get("targets", {})
     targets = {}

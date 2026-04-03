@@ -3,7 +3,7 @@
 ## Source format
 
 - **GitHub**: `org/repo` or `org/repo@ref` (branch/tag). Resolved to the repository; `ref` is used for checkout.
-- **Local**: `./path` or `/absolute/path`. Roles are copied from the path; no git.
+- **Local**: `./path` or `/absolute/path`. Roles are read directly from that path; no git.
 
 ## Install
 
@@ -25,61 +25,43 @@ Without `--yes`, `add` and `update` ask before overwriting existing files.
 
 ```bash
 role-forge add ./my-agents
-role-forge add ./my-agents -g
 ```
 
-### Render to a specific target
-
-```bash
-role-forge render --target claude
-```
-
-### List installed roles
+### List generated project sources
 
 ```bash
 role-forge list
-role-forge list -g
 role-forge list --json
 ```
 
-### Check unmanaged files
+### List cached sources
 
 ```bash
-role-forge doctor
-role-forge doctor -g --json
-```
-
-### Clean unmanaged files
-
-```bash
-role-forge clean --dry-run
-role-forge clean -y
+role-forge list --sources
+role-forge list --sources --json
 ```
 
 ### Update a GitHub source
 
 ```bash
 role-forge update PFCCLab/precision-agents
-role-forge update PFCCLab/precision-agents -g -y
+role-forge update PFCCLab/precision-agents -y
 ```
 
-### Remove a role
+### Remove a source and its generated outputs
 
 ```bash
-role-forge remove explorer
-role-forge remove l2/worker
+role-forge remove PFCCLab/precision-agents --yes
+role-forge remove /absolute/path/to/local-roles --yes
 ```
 
 ## Command model
 
-- `add` fetches a source, validates role topology, installs canonical files, and auto-renders when targets are explicit or detectable
-- `add` is interactive by default; `--yes` skips install and overwrite prompts
-- `render` regenerates target outputs from merged canonical roles, with project scope overriding user scope
-- `list` shows installed roles for one scope at a time; use `-g` for user scope and `--json` for machine-readable output
-- `remove` deletes the canonical file from one scope; target outputs can then be regenerated with `render`
-- `doctor` reports unmanaged files in the selected roles directory
-- `clean` removes unmanaged files from the selected roles directory
-- `update` reuses the `add` flow for non-local sources and also supports `-g`
+- `add` fetches a source, validates role topology, chooses targets, and generates output files directly
+- `update` refreshes a GitHub source and regenerates the same targets and role selection unless overridden
+- `list` shows project-generated sources by default; use `--sources` to inspect the global repo cache index
+- `remove` deletes a source's generated files, removes cached remote repos, and rebuilds remaining recorded sources to restore collisions
+- there is no standalone `render` command; regeneration flows through `add` and `update`
 
 ## Target detection
 
@@ -92,7 +74,7 @@ When `--target` is omitted, `role-forge` detects supported tools from project ma
 
 ## Behavior notes
 
-- **Overwrite**: Without `--yes`, `add` and `update` prompt before overwriting existing roles.
+- **Overwrite**: Without `--yes`, `add` and `update` prompt before overwriting existing output files.
 - **Update**: Only non-local sources can be updated; local paths must be re-added.
-- **Remove**: Deletes the canonical role file only; run `render` to regenerate target outputs or clean up platform dirs.
-- **Scope**: Project scope uses `roles_dir` from `roles.toml` (default `.agents/roles/`); user scope uses `~/.agents/roles/` (see configuration).
+- **Source config**: `roles.toml` is read from the source repo itself; target resolution falls back to adapter defaults or project marker detection when needed.
+- **State files**: project output ownership is tracked in `.role-forge/outputs.json`; cached remote repos are indexed in `~/.config/role-forge/manifest.json`.

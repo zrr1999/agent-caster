@@ -1,5 +1,5 @@
 [project]
-roles_dir = ".agents/roles"
+roles_dir = "roles"
 
 [targets.opencode]
 enabled = true

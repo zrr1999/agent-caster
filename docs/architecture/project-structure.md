@@ -17,12 +17,13 @@ src/role_forge/
 
 ## Module responsibilities
 
-- `cli.py`: user-facing commands such as `add`, `render`, `list`, `remove`, and `update`
-- `config.py`: `roles.toml` loading and roles directory resolution
+- `cli.py`: user-facing commands such as `add`, `list`, `remove`, and `update`
+- `config.py`: `roles.toml` loading, source roles resolution, and project output manifest paths
 - `loader.py`: canonical role loading from Markdown plus YAML frontmatter
+- `outputs.py`: project-local generated-output ownership manifest
 - `models.py`: shared Pydantic models for roles, hierarchy, targets, and outputs
 - `groups.py`: capability-group and bash-policy definitions
-- `registry.py`: source parsing, fetch/update logic, and source-repository role discovery
+- `registry.py`: source parsing, repo-cache fetch/update logic, and source-repository role discovery
 - `platform.py`: target platform detection from project markers
 - `topology.py`: hierarchy, delegation, and output-layout validation
 - `adapters/`: built-in renderers and adapter registry

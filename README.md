@@ -2,7 +2,7 @@
 
 Canonical role-definition toolkit for coding agents.
 
-`role-forge` keeps one canonical role source and renders it into platform-specific agent formats for tools like Claude Code, OpenCode, Cursor, and Windsurf.
+`role-forge` fetches canonical role sources and generates platform-specific agent files for tools like Claude Code, OpenCode, Cursor, and Windsurf.
 
 ## Install
 
@@ -15,21 +15,18 @@ uv tool install role-forge
 ```bash
 role-forge add PFCCLab/precision-agents -y
 role-forge add ./local-roles
-role-forge render --target claude
+role-forge update PFCCLab/precision-agents -y
 role-forge list
+role-forge list --sources
 ```
 
 `add` and `update` ask before overwriting existing files. Use `--yes` to skip confirmations.
-
-Project installs are the default. Use `role-forge add -g`, `role-forge list -g`, and
-`role-forge remove -g` for the user scope in `~/.agents/roles`. Rendering merges both
-scopes and lets project roles override same-id user roles.
 
 ## Why this repo exists
 
 - avoid maintaining the same role prompt in multiple tool-specific formats
 - keep capabilities, delegation policy, and model tiers in one canonical source
-- validate hierarchy and output layout before rendering
+- validate hierarchy and output layout before generation
 - support extension through adapter entry points
 
 ## Capability model

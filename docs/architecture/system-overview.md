@@ -25,11 +25,11 @@ Platform adapters interpret that source into target-specific files without chang
 
 Typical project flow:
 
-1. install or update canonical roles from a GitHub repository or local path
-2. store those roles under `.agents/roles/` or a configured `roles_dir`
-3. resolve target configuration from `roles.toml`
+1. fetch or refresh a canonical role source from a GitHub repository or local path
+2. resolve role definitions from the source repo itself (`roles/` or `project.roles_dir`)
+3. resolve target configuration from the source repo's `roles.toml`, then fall back to adapter defaults or project marker detection
 4. validate hierarchy, delegation, and output layout safety
-5. render platform outputs such as `.claude/agents/*.md`
+5. generate platform outputs such as `.claude/agents/*.md`
 
 ## Design goals
 

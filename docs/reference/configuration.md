@@ -6,7 +6,7 @@ Project configuration lives in `roles.toml`.
 
 ```toml
 [project]
-roles_dir = ".agents/roles"
+roles_dir = "roles"
 
 [targets.claude]
 
@@ -19,24 +19,17 @@ coding = "claude-sonnet-4"
 
 - `roles_dir`: role definitions directory in the **source** repository (used by `find_roles_dir` during `add`)
 
-## Install scopes
+## Runtime state
 
-- project scope is the default install target, always `.agents/roles`
-- user scope uses `~/.agents/roles` and is selected with `-g` or `--global`
-- render operates on the installed scope; `add` only renders roles from the scope that was just installed
-- list and remove operate on one scope at a time: default project, `-g` for user
+- fetched GitHub repos are cached under `~/.config/role-forge/repos`
+- the global cache index lives at `~/.config/role-forge/manifest.json`
+- per-project generated-output ownership lives at `.role-forge/outputs.json`
+- no role store is maintained; outputs are generated directly from the source repo or repo cache
 
 ## Local sources
 
 - local installs use `role-forge add ./path` or `role-forge add /absolute/path`
-- local sources are copied into the selected install scope; symlink installs are not supported
-- if source and destination are the same file, the copy is skipped
-
-## Hygiene commands
-
-- `doctor` reports unmanaged files in the selected roles directory
-- unmanaged files are non-`.md` files or `.md` files that fail role parsing
-- `clean` removes unmanaged files and supports `--dry-run`, `-y`, and `-g`
+- local sources are read directly from disk and are not copied into a separate store
 
 ## Target keys
 
@@ -49,8 +42,7 @@ coding = "claude-sonnet-4"
 When reading a source repository, `role-forge` resolves role files in this order:
 
 1. `roles.toml` with `project.roles_dir`
-2. `.agents/roles/` directory
-3. fallback `roles/`
+2. fallback `roles/`
 
 ## Output layout
 

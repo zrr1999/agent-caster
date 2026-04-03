@@ -4,7 +4,7 @@
 
 ## Layout
 
-Store role files under `roles/` in a source repo, or under `.agents/roles/` after installation.
+Store role files under `roles/` in a source repo.
 
 ```text
 roles/

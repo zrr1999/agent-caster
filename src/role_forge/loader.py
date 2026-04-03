@@ -1,16 +1,14 @@
-"""Loader for canonical agent definitions (.agents/roles/*.md)."""
+"""Loader for canonical agent definitions."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import yaml
 from loguru import logger
 from pydantic import ValidationError
 
-from role_forge import config as config_module
 from role_forge.models import AgentDef, HierarchyConfig, ModelConfig
 
 
@@ -50,36 +48,6 @@ def load_agents(roles_dir: Path, *, strict: bool = False) -> list[AgentDef]:
             logger.warning(f"Skipping {md_path.relative_to(roles_dir)}: {exc}", exc_info=True)
     logger.debug(f"Loaded {len(agents)} agent(s) from {roles_dir}")
     return agents
-
-
-def load_agents_in_scope(
-    project: Path,
-    *,
-    scope: Literal["project", "user"],
-) -> tuple[Path, list[AgentDef]]:
-    """Load agent definitions from a single install scope."""
-    roles_dir = (
-        config_module.resolve_roles_dir(project)
-        if scope == "project"
-        else config_module.USER_ROLES_DIR
-    )
-    if not roles_dir.is_dir():
-        return roles_dir, []
-    return roles_dir, load_agents(roles_dir, strict=True)
-
-
-def load_merged_agents(project: Path, *, include_user: bool = True) -> list[AgentDef]:
-    """Load effective agents with project scope overriding user scope."""
-    merged: dict[str, AgentDef] = {}
-
-    if include_user:
-        _, user_agents = load_agents_in_scope(project, scope="user")
-        merged.update({agent.canonical_id: agent for agent in user_agents})
-
-    _, project_agents = load_agents_in_scope(project, scope="project")
-    merged.update({agent.canonical_id: agent for agent in project_agents})
-
-    return [merged[canonical_id] for canonical_id in sorted(merged)]
 
 
 def find_unmanaged_files(roles_dir: Path) -> list[UnmanagedFileIssue]:
