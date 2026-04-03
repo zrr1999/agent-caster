@@ -3,6 +3,11 @@
   '''
   ---
   description: Precision Aligner. Makes targeted code changes.
+  model: gpt-4o
+  tools:
+    - edit
+    - read
+    - search
   ---
   # Aligner
   '''
@@ -11,9 +16,30 @@
   '''
   ---
   description: Code Explorer. Reads and analyzes source code.
+  model: claude-sonnet-4-5
+  tools:
+    - execute
+    - read
+    - search
+    - web
   ---
   # Explorer
   
   Read-only code exploration agent.
+  '''
+# ---
+# name: test_cast_orchestrator_with_delegates
+  '''
+  ---
+  description: Orchestrator. Coordinates sub-agents.
+  model: claude-sonnet-4-5
+  tools:
+    - agent
+    - edit
+    - execute
+    - read
+    - search
+  ---
+  # Orchestrator
   '''
 # ---
